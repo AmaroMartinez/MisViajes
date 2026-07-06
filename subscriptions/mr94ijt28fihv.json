@@ -19,7 +19,13 @@
       "title": "Mañana sales: Test",
       "body": "¡Todo listo!",
       "sendAt": 1783461600000
+    },
+    {
+      "id": "mr94mzfliv5ur_1h",
+      "title": "Tren en 1 hora: Prueba notif",
+      "body": "Salida: 06 jul, 14:23",
+      "sendAt": 1783336980000
     }
   ],
-  "updatedAt": 1783336721608
+  "updatedAt": 1783336742338
 }
