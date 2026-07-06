@@ -2,7 +2,7 @@
 
 PWA de gestión de viajes (listas de equipaje, trayectos y avisos). Sin framework ni paso de build: HTML + CSS + JS puros. Datos en `localStorage`.
 
-Los avisos con la app cerrada se envían **sin servidor propio**: un workflow de **GitHub Actions** se despierta cada 15 minutos y manda las notificaciones push que toquen.
+Los avisos con la app cerrada se envían **sin servidor propio**: un workflow de **GitHub Actions** se despierta cada 5 minutos y manda las notificaciones push que toquen.
 
 ## Estructura de archivos
 
@@ -22,7 +22,7 @@ Mis Viajes/
 ├── subscriptions/              # Un .json por dispositivo (los crea la app automáticamente)
 │   └── .gitkeep
 └── .github/workflows/
-    └── send-notifications.yml  # cron cada 15 min + envío + commit del estado
+    └── send-notifications.yml  # cron cada 5 min + envío + commit del estado
 ```
 
 ## Cómo funcionan los avisos
@@ -40,7 +40,7 @@ App (app.js)                         GitHub                        Google/Apple 
     │    escribe su suscripción +      │                                    │
     │    calendario en el repo ───────▶│  subscriptions/<deviceId>.json     │
     │    (API de GitHub, con token)    │                                    │
-    │                                  │ 2. cron cada 15 min:               │
+    │                                  │ 2. cron cada 5 min:                │
     │                                  │    notifier/send.js lee los .json  │
     │                                  │    ¿algún aviso vencido? ─────push─▶│
     │                                  │                                    │──▶ 🔔 dispositivo
@@ -135,7 +135,7 @@ A partir de ahí el dispositivo queda registrado. Repite este paso 6 en cada mó
 
 **Requisito iOS**: la PWA debe estar añadida a la pantalla de inicio.
 
-**Precisión**: el cron de GitHub Actions se ejecuta cada 15 min y puede retrasarse unos minutos si GitHub está ocupado. Para avisos tipo "faltan 2 días" o "tren en 1 hora" es más que suficiente. No esperes precisión al minuto exacto.
+**Precisión**: el cron de GitHub Actions se ejecuta cada 5 min y puede retrasarse unos minutos si GitHub está ocupado. Para avisos tipo "faltan 2 días" o "tren en 1 hora" es más que suficiente. No esperes precisión al minuto exacto.
 
 ## Modelo de datos
 

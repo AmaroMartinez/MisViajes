@@ -2,7 +2,7 @@ name: Enviar avisos de viajes
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # cada 15 minutos (GitHub puede retrasarlo unos min)
+    - cron: '*/5 * * * *'    # cada 5 minutos (mínimo que permite GitHub; puede retrasarlo unos min)
   workflow_dispatch:          # permite lanzarlo a mano desde la pestaña Actions
 
 permissions:
