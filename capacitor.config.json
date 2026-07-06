@@ -1,0 +1,9 @@
+{
+  "appId": "com.amaromartinez.misviajes",
+  "appName": "Mis Viajes",
+  "webDir": "www",
+  "server": {
+    "url": "https://amaromartinez.github.io/MisViajes/",
+    "androidScheme": "https"
+  }
+}

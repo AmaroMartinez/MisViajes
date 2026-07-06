@@ -5,6 +5,10 @@ node_modules/
 .env
 *.env
 
+# Capacitor / Android (se generan al compilar en la nube, no se suben)
+android/
+.gradle/
+
 # Sistema
 .DS_Store
 

@@ -1,0 +1,41 @@
+name: Compilar APK Android
+
+on:
+  workflow_dispatch:   # se lanza a mano desde la pestaña Actions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Crear proyecto Android (Capacitor)
+        run: npx cap add android
+
+      - name: Sincronizar web + plugins
+        run: npx cap sync android
+
+      - name: Compilar APK (debug, instalable por sideload)
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+
+      - name: Publicar la APK como artefacto descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: mis-viajes-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
