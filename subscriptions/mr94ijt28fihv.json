@@ -11,21 +11,15 @@
     {
       "id": "mr94iv67n1vvr_2d",
       "title": "Faltan 2 días: Test",
-      "body": "Tienes 1 artículos pendientes.",
+      "body": "Revisa tu equipaje.",
       "sendAt": 1783375200000
     },
     {
       "id": "mr94iv67n1vvr_1d",
       "title": "Mañana sales: Test",
-      "body": "Todavía quedan 1 artículos pendientes.",
+      "body": "¡Todo listo!",
       "sendAt": 1783461600000
-    },
-    {
-      "id": "mr94m6rat4ik0_1h",
-      "title": "Tren en 1 hora: A",
-      "body": "Salida: 06 jul, 14:24",
-      "sendAt": 1783337040000
     }
   ],
-  "updatedAt": 1783336690786
+  "updatedAt": 1783336721608
 }
