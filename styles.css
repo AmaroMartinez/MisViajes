@@ -164,14 +164,7 @@ input, select, button { font-family: inherit; }
 .item.is-done { background: #F6FAF7; border-color: #D8EADF; }
 .item-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .item-name { flex: 1 1 120px; min-width: 100px; border: none; background: transparent; font-weight: 600; font-size: .95rem; padding: 4px 2px; }
-.item-name:focus, .sub-name:focus { outline: none; background: var(--line-2); border-radius: 6px; }
-.sub-count { font-family: var(--mono); font-size: .72rem; color: var(--muted); }
-
-.subitems { margin: 8px 0 4px; padding-left: 10px; border-left: 2px solid var(--line-2); display: grid; gap: 6px; }
-.subitem { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.subitem.is-done { opacity: .72; }
-.sub-name { flex: 1 1 100px; min-width: 90px; border: none; background: transparent; font-size: .88rem; padding: 3px 2px; }
-.add-sub { margin-top: 6px; color: var(--teal); }
+.item-name:focus { outline: none; background: var(--line-2); border-radius: 6px; }
 .add-item { margin-top: 4px; }
 
 /* ---------- Estado (select) ---------- */

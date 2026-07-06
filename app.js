@@ -60,10 +60,30 @@ const store = {
     } catch (e) { /* datos corruptos: empezamos limpios */ }
     if (!this.data.trips) this.data.trips = [];
     if (!this.data.templates) this.data.templates = [];
+    this.migrate();
     if (this.data.templates.length === 0) this.seedTemplates();
   },
   save() {
     localStorage.setItem(KEY, JSON.stringify(this.data));
+  },
+  // Aplana el antiguo 3er nivel: los subartículos pasan a ser artículos de la lista.
+  // El artículo que solo servía de contenedor se descarta. Idempotente (seguro en cada carga).
+  migrate() {
+    const flatten = (lists) => (lists || []).map((l) => {
+      const items = [];
+      for (const it of (l.items || [])) {
+        if ((it.subitems || []).length) {
+          for (const s of it.subitems) {
+            items.push({ id: s.id || uid(), name: s.name, qtyWanted: s.qtyWanted, qtyDone: s.qtyDone, status: s.status });
+          }
+        } else {
+          items.push({ id: it.id, name: it.name, qtyWanted: it.qtyWanted, qtyDone: it.qtyDone, status: it.status });
+        }
+      }
+      return { id: l.id, name: l.name, items };
+    });
+    for (const t of this.data.trips) t.lists = flatten(t.lists);
+    for (const t of this.data.templates) t.lists = flatten(t.lists);
   },
   seedTemplates() {
     // Plantilla de ejemplo para arrancar (editable/borrable)
@@ -72,22 +92,20 @@ const store = {
       name: 'Viaje largo (avión)',
       lists: [
         { id: uid(), name: 'Ropa Maleta', items: [
-          { id: uid(), name: 'Camisetas', qtyWanted: 6, qtyDone: 0, status: 'to_wash', subitems: [] },
-          { id: uid(), name: 'Pantalones', qtyWanted: 3, qtyDone: 0, status: 'pending', subitems: [] },
-          { id: uid(), name: 'Ropa interior', qtyWanted: 8, qtyDone: 0, status: 'to_wash', subitems: [] },
-          { id: uid(), name: 'Calzado', qtyWanted: 2, qtyDone: 0, status: 'pending', subitems: [] },
+          { id: uid(), name: 'Camisetas', qtyWanted: 6, qtyDone: 0, status: 'to_wash' },
+          { id: uid(), name: 'Pantalones', qtyWanted: 3, qtyDone: 0, status: 'pending' },
+          { id: uid(), name: 'Ropa interior', qtyWanted: 8, qtyDone: 0, status: 'to_wash' },
+          { id: uid(), name: 'Calzado', qtyWanted: 2, qtyDone: 0, status: 'pending' },
         ]},
         { id: uid(), name: 'Neceser Maleta', items: [
-          { id: uid(), name: 'Aseo', qtyWanted: 1, qtyDone: 0, status: 'pending', subitems: [
-            { id: uid(), name: 'Cepillo de dientes', qtyWanted: 1, qtyDone: 0, status: 'pending' },
-            { id: uid(), name: 'Pasta de dientes', qtyWanted: 1, qtyDone: 0, status: 'to_buy' },
-          ]},
+          { id: uid(), name: 'Cepillo de dientes', qtyWanted: 1, qtyDone: 0, status: 'pending' },
+          { id: uid(), name: 'Pasta de dientes', qtyWanted: 1, qtyDone: 0, status: 'to_buy' },
         ]},
         { id: uid(), name: 'Mochila (mano)', items: [
-          { id: uid(), name: 'Móvil', qtyWanted: 1, qtyDone: 0, status: 'to_charge', subitems: [] },
-          { id: uid(), name: 'Powerbank', qtyWanted: 1, qtyDone: 0, status: 'to_charge', subitems: [] },
-          { id: uid(), name: 'Pasaporte', qtyWanted: 1, qtyDone: 0, status: 'pending', subitems: [] },
-          { id: uid(), name: 'Adaptador de enchufe', qtyWanted: 1, qtyDone: 0, status: 'to_buy', subitems: [] },
+          { id: uid(), name: 'Móvil', qtyWanted: 1, qtyDone: 0, status: 'to_charge' },
+          { id: uid(), name: 'Powerbank', qtyWanted: 1, qtyDone: 0, status: 'to_charge' },
+          { id: uid(), name: 'Pasaporte', qtyWanted: 1, qtyDone: 0, status: 'pending' },
+          { id: uid(), name: 'Adaptador de enchufe', qtyWanted: 1, qtyDone: 0, status: 'to_buy' },
         ]},
       ],
     });
@@ -97,9 +115,6 @@ const store = {
 
 /* ---------- Constructores de datos ---------- */
 function newItem(name = '') {
-  return { id: uid(), name, qtyWanted: 1, qtyDone: 0, status: 'pending', subitems: [] };
-}
-function newSub(name = '') {
   return { id: uid(), name, qtyWanted: 1, qtyDone: 0, status: 'pending' };
 }
 function newList(name = 'Nueva lista') {
@@ -116,38 +131,24 @@ function cloneLists(lists, reset = true) {
       qtyWanted: it.qtyWanted,
       qtyDone: reset ? 0 : it.qtyDone,
       status: it.status,
-      subitems: (it.subitems || []).map((s) => ({
-        id: uid(), name: s.name, qtyWanted: s.qtyWanted,
-        qtyDone: reset ? 0 : s.qtyDone, status: s.status,
-      })),
     })),
   }));
 }
 
 /* ---------- Cálculo de pendientes ---------- */
-// Un nodo (item o subitem) está pendiente si faltan unidades por meter o el estado no es "listo".
+// Un artículo está pendiente si faltan unidades por meter o el estado no es "listo".
 function nodePending(n) {
   const missing = clampInt(n.qtyWanted) - clampInt(n.qtyDone);
   return missing > 0 || n.status !== 'ready';
 }
 function tripPendingCount(trip) {
   let count = 0;
-  for (const l of trip.lists) {
-    for (const it of l.items) {
-      if ((it.subitems || []).length) {
-        for (const s of it.subitems) if (nodePending(s)) count++;
-      } else if (nodePending(it)) count++;
-    }
-  }
+  for (const l of trip.lists) for (const it of l.items) if (nodePending(it)) count++;
   return count;
 }
 function tripTotalCount(trip) {
   let count = 0;
-  for (const l of trip.lists) {
-    for (const it of l.items) {
-      count += (it.subitems || []).length ? it.subitems.length : 1;
-    }
-  }
+  for (const l of trip.lists) count += l.items.length;
   return count;
 }
 
@@ -370,11 +371,7 @@ function renderListsBlock(lists, { context }) {
     return `<div class="empty small"><p class="muted">Sin listas todavía.</p></div>`;
   }
   return lists.map((l) => {
-    const pend = context === 'trip'
-      ? l.items.reduce((a, it) => a + ((it.subitems || []).length
-          ? it.subitems.filter(nodePending).length
-          : (nodePending(it) ? 1 : 0)), 0)
-      : 0;
+    const pend = context === 'trip' ? l.items.filter(nodePending).length : 0;
     return `<section class="list-card" data-list="${l.id}">
       <div class="list-head">
         <input class="list-title" data-list-name="${l.id}" value="${esc(l.name)}" placeholder="Nombre de la lista">
@@ -418,26 +415,13 @@ function qtyControl(node, kind, ids) {
 
 function renderItem(listId, it, context) {
   const ids = `${listId}:${it.id}`;
-  const subs = (it.subitems || []).map((s) => {
-    const sids = `${listId}:${it.id}:${s.id}`;
-    return `<div class="subitem ${nodePending(s) ? '' : 'is-done'}">
-      <input class="sub-name" data-sub-name="${sids}" value="${esc(s.name)}" placeholder="Subartículo">
-      ${context === 'trip' ? qtyControl(s, 'sub', sids) : ''}
-      ${statusChip(s, 'sub', sids)}
-      <button class="icon-btn danger tiny" data-del-sub="${sids}" title="Borrar">✕</button>
-    </div>`;
-  }).join('');
-
-  const hasSubs = (it.subitems || []).length > 0;
-  return `<div class="item ${!hasSubs && context === 'trip' && !nodePending(it) ? 'is-done' : ''}">
+  return `<div class="item ${context === 'trip' && !nodePending(it) ? 'is-done' : ''}">
     <div class="item-main">
       <input class="item-name" data-item-name="${ids}" value="${esc(it.name)}" placeholder="Artículo">
-      ${!hasSubs && context === 'trip' ? qtyControl(it, 'item', ids) : ''}
-      ${!hasSubs ? statusChip(it, 'item', ids) : `<span class="sub-count">${it.subitems.length} sub</span>`}
+      ${context === 'trip' ? qtyControl(it, 'item', ids) : ''}
+      ${statusChip(it, 'item', ids)}
       <button class="icon-btn danger tiny" data-del-item="${ids}" title="Borrar">✕</button>
     </div>
-    ${hasSubs ? `<div class="subitems">${subs}</div>` : ''}
-    <button class="btn ghost tiny add-sub" data-add-sub="${ids}">+ Subartículo</button>
   </div>`;
 }
 
@@ -483,7 +467,7 @@ function bindDynamic() {
 
 // Delegación global para clicks
 app.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-sub],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-sub],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-qtydone-inc-sub],[data-qtydone-dec-sub],[data-qtywant-inc-sub],[data-qtywant-dec-sub]');
+  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item]');
   if (!el) return;
   const d = el.dataset;
 
@@ -506,15 +490,10 @@ app.addEventListener('click', (e) => {
 
   if (d.delList) { removeList(d.delList); return saveRender(); }
   if (d.delItem) { const [l, i] = d.delItem.split(':'); removeItem(l, i); return saveRender(); }
-  if (d.delSub) { const [l, i, s] = d.delSub.split(':'); removeSub(l, i, s); return saveRender(); }
   if (d.delLeg) { const tr = currentTrip(); tr.legs = tr.legs.filter((x) => x.id !== d.delLeg); syncPushSchedule(); return saveRender(); }
 
   if ('addList' in d || 'addListTpl' in d) { t.lists.push(newList()); return saveRender(); }
   if (d.addItem) { findList(d.addItem).items.push(newItem()); return saveRender(); }
-  if (d.addSub) {
-    const [l, i] = d.addSub.split(':'); const it = findItem(l, i);
-    it.subitems = it.subitems || []; it.subitems.push(newSub()); return saveRender();
-  }
   if ('addLeg' in d) {
     const tr = currentTrip(); tr.legs = tr.legs || [];
     tr.legs.push({ id: uid(), type: 'train', name: '', datetime: '', notified1d: false, notified1h: false });
@@ -524,13 +503,11 @@ app.addEventListener('click', (e) => {
 
   // Steppers de cantidad
   const stepper = [
-    ['qtydoneIncItem', 'item', 'qtyDone', +1], ['qtydoneDecItem', 'item', 'qtyDone', -1],
-    ['qtywantIncItem', 'item', 'qtyWanted', +1], ['qtywantDecItem', 'item', 'qtyWanted', -1],
-    ['qtydoneIncSub', 'sub', 'qtyDone', +1], ['qtydoneDecSub', 'sub', 'qtyDone', -1],
-    ['qtywantIncSub', 'sub', 'qtyWanted', +1], ['qtywantDecSub', 'sub', 'qtyWanted', -1],
+    ['qtydoneIncItem', 'qtyDone', +1], ['qtydoneDecItem', 'qtyDone', -1],
+    ['qtywantIncItem', 'qtyWanted', +1], ['qtywantDecItem', 'qtyWanted', -1],
   ];
-  for (const [key, kind, field, delta] of stepper) {
-    if (d[key]) { adjustQty(d[key], kind, field, delta); return saveRender(); }
+  for (const [key, field, delta] of stepper) {
+    if (d[key]) { adjustQty(d[key], field, delta); return saveRender(); }
   }
 });
 
@@ -544,7 +521,6 @@ app.addEventListener('input', (e) => {
 
   if ('listName' in d) { findList(d.listName).name = el.value; store.save(); return; }
   if ('itemName' in d) { const [l, i] = d.itemName.split(':'); findItem(l, i).name = el.value; store.save(); return; }
-  if ('subName' in d) { const [l, i, s] = d.subName.split(':'); findSub(l, i, s).name = el.value; store.save(); return; }
 
   if ('legName' in d) { findLeg(d.legName).name = el.value; store.save(); return; }
   if ('legDt' in d) { const lg = findLeg(d.legDt); lg.datetime = el.value; lg.notified1d = lg.notified1h = false; store.save(); syncPushSchedule(); return updateBoards(); }
@@ -554,7 +530,6 @@ app.addEventListener('input', (e) => {
 app.addEventListener('change', (e) => {
   const el = e.target, d = el.dataset;
   if ('statusItem' in d) { const [l, i] = d.statusItem.split(':'); findItem(l, i).status = el.value; return saveRender(); }
-  if ('statusSub' in d) { const [l, i, s] = d.statusSub.split(':'); findSub(l, i, s).status = el.value; return saveRender(); }
   if ('legType' in d) { findLeg(d.legType).type = el.value; return saveRender(); }
 });
 
@@ -562,15 +537,13 @@ app.addEventListener('change', (e) => {
 function container() { return currentTrip() || currentTemplate(); }
 function findList(id) { return container().lists.find((l) => l.id === id); }
 function findItem(lid, iid) { return findList(lid).items.find((i) => i.id === iid); }
-function findSub(lid, iid, sid) { return findItem(lid, iid).subitems.find((s) => s.id === sid); }
 function findLeg(id) { return currentTrip().legs.find((l) => l.id === id); }
 function removeList(id) { const c = container(); c.lists = c.lists.filter((l) => l.id !== id); }
 function removeItem(lid, iid) { const l = findList(lid); l.items = l.items.filter((i) => i.id !== iid); }
-function removeSub(lid, iid, sid) { const it = findItem(lid, iid); it.subitems = it.subitems.filter((s) => s.id !== sid); }
 
-function adjustQty(ids, kind, field, delta) {
-  const parts = ids.split(':');
-  const node = kind === 'sub' ? findSub(parts[0], parts[1], parts[2]) : findItem(parts[0], parts[1]);
+function adjustQty(ids, field, delta) {
+  const [lid, iid] = ids.split(':');
+  const node = findItem(lid, iid);
   node[field] = clampInt(node[field] + delta);
   if (node.qtyDone > node.qtyWanted && field === 'qtyDone') node.qtyWanted = node.qtyDone;
   // Autocompletar estado: si ya está todo metido, marcar listo

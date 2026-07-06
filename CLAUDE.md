@@ -147,7 +147,7 @@ A partir de ahí el dispositivo queda registrado. Repite este paso 6 en cada mó
   trips: [{
     id, name, startDate, endDate,
     notified2d, notified1d,   // flags del motor local (checkReminders)
-    lists: [{ id, name, items: [{ id, name, qtyWanted, qtyDone, status, subitems }] }],
+    lists: [{ id, name, items: [{ id, name, qtyWanted, qtyDone, status }] }],  // 2 niveles: lista → artículo
     legs: [{ id, type, name, datetime, notified1d, notified1h }]
   }],
   templates: [{ id, name, lists }]
