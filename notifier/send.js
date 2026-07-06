@@ -43,7 +43,8 @@ async function main() {
       try {
         await webpush.sendNotification(
           subscription,
-          JSON.stringify({ title: item.title, body: item.body, tag: item.id })
+          JSON.stringify({ title: item.title, body: item.body, tag: item.id }),
+          { urgency: 'high', TTL: 24 * 60 * 60 } // alta prioridad; válido 24 h por si el móvil está dormido
         );
         sent.add(key);
         changed = true;
