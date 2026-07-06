@@ -37,6 +37,19 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
+// Recibe push del servidor y muestra la notificación (funciona con la app cerrada).
+self.addEventListener('push', (e) => {
+  const data = e.data?.json() || {};
+  e.waitUntil(
+    self.registration.showNotification(data.title || 'Viajes', {
+      body: data.body || '',
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
+      tag: data.tag || 'viajes-push',
+    })
+  );
+});
+
 // Al tocar una notificación, enfoca o abre la app.
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();

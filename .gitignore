@@ -1,0 +1,12 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (nunca subir claves)
+.env
+*.env
+
+# Sistema
+.DS_Store
+
+# Nota: la carpeta subscriptions/ SÍ se sube (con su .gitkeep).
+# La app irá añadiendo ahí un .json por dispositivo automáticamente.

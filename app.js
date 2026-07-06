@@ -3,6 +3,19 @@
    Datos en localStorage. Todo editable, sin servidor.
    ============================================================ */
 
+/* ---------- Configuración de avisos en segundo plano (GitHub Actions) ----------
+   Los avisos con la app cerrada los envía un workflow de GitHub (sin servidor).
+   Rellena estas tres constantes (ver CLAUDE.md → "Puesta en marcha"):
+     1. GITHUB_OWNER → tu usuario/organización de GitHub
+     2. GITHUB_REPO  → nombre del repositorio donde vive esta app
+     3. VAPID_PUBLIC_KEY → clave pública generada con: cd notifier && npm run keys
+   El token de GitHub NO se pone aquí: se introduce una vez desde la app (pestaña Avisos)
+   y se guarda solo en ese dispositivo.
+   ------------------------------------------------------------------------------- */
+const GITHUB_OWNER = '';       // p. ej. 'amartinez'
+const GITHUB_REPO = '';        // p. ej. 'mis-viajes'
+const VAPID_PUBLIC_KEY = '';   // clave pública VAPID
+
 'use strict';
 
 /* ---------- Utilidades ---------- */
@@ -482,7 +495,7 @@ app.addEventListener('click', (e) => {
 
   if (d.delTrip) return confirmDelete('¿Borrar este viaje y todas sus listas?', () => {
     store.data.trips = store.data.trips.filter((x) => x.id !== d.delTrip);
-    store.save(); go('home');
+    store.save(); syncPushSchedule(); go('home');
   });
   if (d.delTpl) return confirmDelete('¿Borrar esta plantilla?', () => {
     store.data.templates = store.data.templates.filter((x) => x.id !== d.delTpl);
@@ -494,7 +507,7 @@ app.addEventListener('click', (e) => {
   if (d.delList) { removeList(d.delList); return saveRender(); }
   if (d.delItem) { const [l, i] = d.delItem.split(':'); removeItem(l, i); return saveRender(); }
   if (d.delSub) { const [l, i, s] = d.delSub.split(':'); removeSub(l, i, s); return saveRender(); }
-  if (d.delLeg) { const tr = currentTrip(); tr.legs = tr.legs.filter((x) => x.id !== d.delLeg); return saveRender(); }
+  if (d.delLeg) { const tr = currentTrip(); tr.legs = tr.legs.filter((x) => x.id !== d.delLeg); syncPushSchedule(); return saveRender(); }
 
   if (d.addList || d.addListTpl) { t.lists.push(newList()); return saveRender(); }
   if (d.addItem) { findList(d.addItem).items.push(newItem()); return saveRender(); }
@@ -534,7 +547,7 @@ app.addEventListener('input', (e) => {
   if ('subName' in d) { const [l, i, s] = d.subName.split(':'); findSub(l, i, s).name = el.value; store.save(); return; }
 
   if ('legName' in d) { findLeg(d.legName).name = el.value; store.save(); return; }
-  if ('legDt' in d) { const lg = findLeg(d.legDt); lg.datetime = el.value; lg.notified1d = lg.notified1h = false; store.save(); return updateBoards(); }
+  if ('legDt' in d) { const lg = findLeg(d.legDt); lg.datetime = el.value; lg.notified1d = lg.notified1h = false; store.save(); syncPushSchedule(); return updateBoards(); }
 });
 
 // Selects (estado / tipo de trayecto)
@@ -579,6 +592,7 @@ function updateBoards() {
 function resetTripFlags() {
   const t = currentTrip();
   if (t) { t.notified2d = false; t.notified1d = false; }
+  syncPushSchedule();
 }
 
 /* ============================================================
@@ -598,7 +612,7 @@ function createTripFlow() {
         lists: label === 'Empezar desde cero' ? [] : cloneLists(tpls[i - 1].lists, true),
         legs: [], notified2d: false, notified1d: false,
       };
-      store.data.trips.push(trip); store.save();
+      store.data.trips.push(trip); store.save(); syncPushSchedule();
       go('trip', { tripId: trip.id, tab: 'lists' });
     },
   })));
@@ -655,6 +669,174 @@ function toast(msg) {
   document.body.appendChild(el);
   setTimeout(() => el.classList.add('show'), 10);
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2200);
+}
+
+/* ============================================================
+   PUSH EN SEGUNDO PLANO
+   ============================================================ */
+
+function urlBase64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+  const base64 = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+// Genera el calendario completo de avisos futuros a partir de los datos actuales.
+function buildPushSchedule() {
+  const now = Date.now();
+  const items = [];
+  for (const t of store.data.trips) {
+    if (t.startDate) {
+      const start = new Date(t.startDate + 'T00:00:00').getTime();
+      if (start > now) {
+        const pend = tripPendingCount(t);
+        const name = t.name || 'tu viaje';
+        items.push({
+          id: `${t.id}_2d`,
+          title: `Faltan 2 días: ${name}`,
+          body: pend > 0 ? `Tienes ${pend} artículos pendientes.` : 'Revisa tu equipaje.',
+          sendAt: start - 2 * DAY,
+        });
+        items.push({
+          id: `${t.id}_1d`,
+          title: `Mañana sales: ${name}`,
+          body: pend > 0 ? `Todavía quedan ${pend} artículos pendientes.` : '¡Todo listo!',
+          sendAt: start - DAY,
+        });
+      }
+    }
+    for (const leg of (t.legs || [])) {
+      if (!leg.datetime) continue;
+      const dt = new Date(leg.datetime).getTime();
+      if (dt > now) {
+        const ty = legType(leg.type).label;
+        const legName = leg.name || t.name || 'trayecto';
+        items.push({
+          id: `${leg.id}_1d`,
+          title: `${ty} mañana: ${legName}`,
+          body: `Salida: ${fmtDateTime(leg.datetime)}`,
+          sendAt: dt - DAY,
+        });
+        items.push({
+          id: `${leg.id}_1h`,
+          title: `${ty} en 1 hora: ${legName}`,
+          body: `Salida: ${fmtDateTime(leg.datetime)}`,
+          sendAt: dt - HOUR,
+        });
+      }
+    }
+  }
+  return items.filter((item) => item.sendAt > now);
+}
+
+async function getPushSub() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+
+/* ---------- Identidad de dispositivo y token ---------- */
+// Cada dispositivo tiene su propio fichero de suscripción en el repo.
+function deviceId() {
+  let id = localStorage.getItem('viajes_device_id');
+  if (!id) { id = uid(); localStorage.setItem('viajes_device_id', id); }
+  return id;
+}
+function ghToken() { return localStorage.getItem('viajes_gh_token') || ''; }
+function setGhToken(t) { localStorage.setItem('viajes_gh_token', t.trim()); }
+function clearGhToken() { localStorage.removeItem('viajes_gh_token'); }
+// ¿Está todo lo necesario para funcionar en segundo plano?
+function pushConfigured() {
+  return !!(GITHUB_OWNER && GITHUB_REPO && VAPID_PUBLIC_KEY && ghToken());
+}
+function subPath() { return `subscriptions/${deviceId()}.json`; }
+
+/* ---------- Escritura en el repo vía API de GitHub ---------- */
+// Codifica texto UTF-8 a base64 (lo que exige la API de contenidos de GitHub).
+function b64utf8(str) { return btoa(unescape(encodeURIComponent(str))); }
+
+function ghHeaders() {
+  return { Authorization: `Bearer ${ghToken()}`, Accept: 'application/vnd.github+json' };
+}
+function ghUrl(p) { return `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${p}`; }
+
+// Crea o actualiza un fichero JSON en el repo.
+async function ghPut(p, obj) {
+  const url = ghUrl(p);
+  let sha;
+  try {
+    const r = await fetch(url, { headers: ghHeaders() });
+    if (r.ok) sha = (await r.json()).sha; // si ya existe, necesitamos su sha para sobrescribir
+  } catch (e) { /* red no disponible */ }
+  const body = { message: `Actualizar avisos (${p})`, content: b64utf8(JSON.stringify(obj, null, 2)) };
+  if (sha) body.sha = sha;
+  const res = await fetch(url, { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body) });
+  return res.ok;
+}
+
+// Borra el fichero de suscripción de este dispositivo.
+async function ghDelete(p) {
+  const url = ghUrl(p);
+  const r = await fetch(url, { headers: ghHeaders() });
+  if (!r.ok) return;
+  const sha = (await r.json()).sha;
+  await fetch(url, { method: 'DELETE', headers: ghHeaders(), body: JSON.stringify({ message: `Eliminar ${p}`, sha }) });
+}
+
+// Comprueba que el token tiene permiso de escritura en el repo indicado.
+async function ghCheckToken() {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}`, { headers: ghHeaders() });
+    if (!r.ok) return false;
+    const j = await r.json();
+    return !!j.permissions?.push;
+  } catch { return false; }
+}
+
+async function subscribePush() {
+  if (!GITHUB_OWNER || !GITHUB_REPO || !VAPID_PUBLIC_KEY || !ghToken()) return false;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    return await ghPut(subPath(), {
+      subscription: sub.toJSON(),
+      schedule: buildPushSchedule(),
+      updatedAt: Date.now(),
+    });
+  } catch (e) {
+    console.error('subscribePush:', e);
+    return false;
+  }
+}
+
+async function unsubscribePush() {
+  const sub = await getPushSub();
+  try { await ghDelete(subPath()); } catch (e) { /* silencioso */ }
+  if (sub) { try { await sub.unsubscribe(); } catch (e) { /* silencioso */ } }
+}
+
+// Debounce: reescribe el calendario en el repo tras cambiar fechas (evita commits en cada tecla).
+let _syncTimer = null;
+function syncPushSchedule() {
+  if (!pushConfigured()) return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(async () => {
+    const sub = await getPushSub();
+    if (!sub) return;
+    await ghPut(subPath(), {
+      subscription: sub.toJSON(),
+      schedule: buildPushSchedule(),
+      updatedAt: Date.now(),
+    });
+  }, 2500);
 }
 
 /* ============================================================
@@ -719,24 +901,84 @@ function checkReminders() {
 }
 
 // Hoja de ajustes de avisos
-function openNotifySheet() {
+async function openNotifySheet() {
   const p = notif.perm();
-  const state = p === 'granted' ? 'Activadas' : p === 'denied' ? 'Bloqueadas en el navegador' : 'Sin activar';
-  openSheet('Avisos', `Estado: ${state}`, [
-    ...(p !== 'granted' ? [{
+  const pushSub = await getPushSub();
+  const serverReady = !!(GITHUB_OWNER && GITHUB_REPO && VAPID_PUBLIC_KEY);
+  const hasToken = !!ghToken();
+
+  const permLabel = p === 'granted' ? 'Activados' : p === 'denied' ? 'Bloqueados en el navegador' : 'Sin activar';
+  let pushLabel;
+  if (!serverReady) pushLabel = 'Segundo plano no disponible';
+  else if (!hasToken) pushLabel = 'Falta conectar con GitHub';
+  else pushLabel = pushSub ? 'Segundo plano: ON' : 'Segundo plano: OFF';
+
+  const actions = [];
+
+  // Paso 1: permiso del navegador
+  if (p !== 'granted') {
+    actions.push({
       label: 'Activar avisos', kind: 'primary', action: async () => {
         const r = await notif.request();
         closeSheet();
-        if (r === 'granted') { toast('Avisos activados'); checkReminders(); }
-        else toast('No se han podido activar');
+        toast(r === 'granted' ? 'Avisos activados' : 'No se han podido activar');
+        if (r === 'granted') checkReminders();
       },
-    }] : [{
-      label: 'Enviar aviso de prueba', kind: 'primary', action: () => {
-        closeSheet(); notif.show('Aviso de prueba', 'Las notificaciones funcionan en este dispositivo.');
+    });
+  } else {
+    actions.push({
+      label: 'Aviso de prueba', kind: 'primary', action: () => {
+        closeSheet();
+        notif.show('Aviso de prueba', 'Las notificaciones funcionan en este dispositivo.');
       },
-    }]),
-    { label: 'Cerrar', kind: 'ghost', action: closeSheet },
-  ]);
+    });
+  }
+
+  // Paso 2: segundo plano (solo si el permiso está concedido y el proyecto está configurado)
+  if (p === 'granted' && serverReady) {
+    if (!hasToken) {
+      actions.push({
+        label: 'Conectar con GitHub (una vez)', kind: 'default', action: async () => {
+          const t = prompt('Pega tu token de GitHub (fine-grained, con permiso de escritura en el repo):');
+          if (!t) return;
+          setGhToken(t);
+          toast('Comprobando token…');
+          const ok = await ghCheckToken();
+          if (!ok) { clearGhToken(); toast('Token inválido o sin permiso'); return; }
+          const sub = await subscribePush();
+          closeSheet();
+          toast(sub ? 'Avisos en segundo plano activados' : 'No se pudo registrar el dispositivo');
+        },
+      });
+    } else if (!pushSub) {
+      actions.push({
+        label: 'Activar segundo plano', kind: 'default', action: async () => {
+          closeSheet();
+          const ok = await subscribePush();
+          toast(ok ? 'Avisos en segundo plano activados' : 'No se pudo registrar (revisa el token)');
+        },
+      });
+    } else {
+      actions.push({
+        label: 'Desactivar segundo plano', kind: 'default', action: async () => {
+          closeSheet();
+          await unsubscribePush();
+          toast('Avisos en segundo plano desactivados');
+        },
+      });
+      actions.push({
+        label: 'Olvidar token de GitHub', kind: 'ghost', action: () => {
+          clearGhToken();
+          closeSheet();
+          toast('Token borrado de este dispositivo');
+        },
+      });
+    }
+  }
+
+  actions.push({ label: 'Cerrar', kind: 'ghost', action: closeSheet });
+
+  openSheet('Avisos', `${permLabel} · ${pushLabel}`, actions);
 }
 
 /* ============================================================
