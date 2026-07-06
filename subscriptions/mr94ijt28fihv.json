@@ -21,11 +21,11 @@
       "sendAt": 1783461600000
     },
     {
-      "id": "mr95hz4licmor_1h",
-      "title": "Bus en 1 hora: Test notificacion",
-      "body": "Salida: 06 jul, 14:47",
-      "sendAt": 1783338420000
+      "id": "mr95utvhip0bv_1h",
+      "title": "Tren en 1 hora: Test",
+      "body": "Salida: 06 jul, 14:54",
+      "sendAt": 1783338840000
     }
   ],
-  "updatedAt": 1783338198421
+  "updatedAt": 1783338785538
 }
