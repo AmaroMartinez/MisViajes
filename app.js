@@ -12,9 +12,9 @@
    El token de GitHub NO se pone aquí: se introduce una vez desde la app (pestaña Avisos)
    y se guarda solo en ese dispositivo.
    ------------------------------------------------------------------------------- */
-const GITHUB_OWNER = '';       // p. ej. 'amartinez'
-const GITHUB_REPO = '';        // p. ej. 'mis-viajes'
-const VAPID_PUBLIC_KEY = '';   // clave pública VAPID
+const GITHUB_OWNER = 'AmaroMartinez';
+const GITHUB_REPO = 'MisViajes';
+const VAPID_PUBLIC_KEY = 'BBgboX0Ie5vf6OkY6UgrHvhboWik-Judl7Wj5FEtSrmb7xy4KfmHRMkOqFL-Zu4caojq5vyh220zr-M9btWws7o';
 
 'use strict';
 
