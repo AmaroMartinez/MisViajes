@@ -489,8 +489,8 @@ app.addEventListener('click', (e) => {
 
   if (d.openTrip) return go('trip', { tripId: d.openTrip, tab: 'lists' });
   if (d.openTpl) return go('template', { templateId: d.openTpl });
-  if (d.newTrip) return createTripFlow();
-  if (d.newTpl) return createTemplate();
+  if ('newTrip' in d) return createTripFlow();
+  if ('newTpl' in d) return createTemplate();
   if ('tab' in d) { view.tab = d.tab; return render(); }
 
   if (d.delTrip) return confirmDelete('¿Borrar este viaje y todas sus listas?', () => {
@@ -509,18 +509,18 @@ app.addEventListener('click', (e) => {
   if (d.delSub) { const [l, i, s] = d.delSub.split(':'); removeSub(l, i, s); return saveRender(); }
   if (d.delLeg) { const tr = currentTrip(); tr.legs = tr.legs.filter((x) => x.id !== d.delLeg); syncPushSchedule(); return saveRender(); }
 
-  if (d.addList || d.addListTpl) { t.lists.push(newList()); return saveRender(); }
+  if ('addList' in d || 'addListTpl' in d) { t.lists.push(newList()); return saveRender(); }
   if (d.addItem) { findList(d.addItem).items.push(newItem()); return saveRender(); }
   if (d.addSub) {
     const [l, i] = d.addSub.split(':'); const it = findItem(l, i);
     it.subitems = it.subitems || []; it.subitems.push(newSub()); return saveRender();
   }
-  if (d.addLeg) {
+  if ('addLeg' in d) {
     const tr = currentTrip(); tr.legs = tr.legs || [];
     tr.legs.push({ id: uid(), type: 'train', name: '', datetime: '', notified1d: false, notified1h: false });
     return saveRender();
   }
-  if (d.saveAsTpl) return saveTripAsTemplate();
+  if ('saveAsTpl' in d) return saveTripAsTemplate();
 
   // Steppers de cantidad
   const stepper = [
