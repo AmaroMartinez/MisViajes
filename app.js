@@ -262,7 +262,7 @@ function renderHome() {
 
   return `
   <header class="topbar">
-    <div class="brand"><span class="brand-mark">◑</span> Viajes</div>
+    <div class="brand"><span class="brand-mark">◑</span> Mis Viajes</div>
     <button class="btn btn-primary" data-new-trip>+ Nuevo viaje</button>
   </header>
   <main class="wrap">

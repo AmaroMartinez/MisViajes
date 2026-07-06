@@ -1,6 +1,6 @@
 {
-  "name": "Viajes — preparación y equipaje",
-  "short_name": "Viajes",
+  "name": "Mis Viajes — preparación y equipaje",
+  "short_name": "Mis Viajes",
   "description": "Listas de viaje con estados y cantidades, plantillas, trayectos y avisos.",
   "start_url": "./",
   "scope": "./",
