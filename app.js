@@ -836,6 +836,9 @@ const notif = {
 
 // Motor de comprobación: se ejecuta al abrir la app y cada minuto mientras esté abierta.
 function checkReminders() {
+  // Si los avisos en segundo plano (push) están activos, es el servidor quien los envía.
+  // Evitamos duplicados y el molesto "todos los avisos de golpe al abrir la app".
+  if (pushConfigured()) return;
   if (notif.perm() !== 'granted') return;
   const now = Date.now();
   let changed = false;

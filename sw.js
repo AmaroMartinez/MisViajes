@@ -1,5 +1,5 @@
 /* Service worker: cachea la app para uso offline y gestiona clics en avisos. */
-const CACHE = 'viajes-v3';
+const CACHE = 'viajes-v4';
 const ASSETS = [
   './',
   './index.html',
