@@ -450,8 +450,8 @@ app.addEventListener('click', (e) => {
   if (!el) return;
   const d = el.dataset;
 
-  if (d.openTrip) return go('trip', { tripId: d.openTrip, tab: 'lists' });
-  if (d.openTpl) return go('template', { templateId: d.openTpl });
+  if (d.openTrip) { collapseAllLists(store.data.trips.find((x) => x.id === d.openTrip)); return go('trip', { tripId: d.openTrip, tab: 'lists' }); }
+  if (d.openTpl) { collapseAllLists(store.data.templates.find((x) => x.id === d.openTpl)); return go('template', { templateId: d.openTpl }); }
   if ('newTrip' in d) return createTripFlow();
   if ('newTpl' in d) return createTemplate();
   if ('tab' in d) { view.tab = d.tab; return render(); }
@@ -542,6 +542,12 @@ app.addEventListener('change', (e) => {
 });
 
 /* ---------- Helpers de mutación ---------- */
+// Al abrir un viaje/plantilla, todas las listas empiezan plegadas.
+function collapseAllLists(c) {
+  if (!c || !c.lists) return;
+  for (const l of c.lists) l.collapsed = true;
+  store.save();
+}
 function container() { return currentTrip() || currentTemplate(); }
 function findList(id) { return container().lists.find((l) => l.id === id); }
 function findItem(lid, iid) { return findList(lid).items.find((i) => i.id === iid); }
