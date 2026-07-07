@@ -574,7 +574,7 @@ app.addEventListener('input', (e) => {
   if ('legName' in d) { findLeg(d.legName).name = el.value; store.save(); return; }
 
   // Datos del viaje
-  if ('checkinAt' in d) { currentTrip().info.checkin.at = el.value; store.save(); return; }
+  if ('checkinAt' in d) { currentTrip().info.checkin.at = el.value; store.save(); scheduleReminderSync(); return; }
   if ('tripNotes' in d) { currentTrip().info.notes = el.value; store.save(); return; }
   if ('kvKey' in d) { const f = currentTrip().info.fields.find((x) => x.id === d.kvKey); if (f) f.key = el.value; store.save(); return; }
   if ('kvVal' in d) { const f = currentTrip().info.fields.find((x) => x.id === d.kvVal); if (f) f.value = el.value; store.save(); return; }
@@ -586,7 +586,7 @@ app.addEventListener('change', (e) => {
   const el = e.target, d = el.dataset;
   if ('statusItem' in d) { const [l, i] = d.statusItem.split(':'); findItem(l, i).status = el.value; return saveRender(); }
   if ('legType' in d) { findLeg(d.legType).type = el.value; return saveRender(); }
-  if ('checkinHas' in d) { currentTrip().info.checkin.has = el.checked; return saveRender(); }
+  if ('checkinHas' in d) { currentTrip().info.checkin.has = el.checked; scheduleReminderSync(); return saveRender(); }
 
   // Ajustes
   if ('setLeglead' in d) { store.data.settings.legLeadMin = clampInt(el.value) || 60; store.save(); scheduleReminderSync(); return; }
@@ -766,6 +766,16 @@ function buildReminders() {
           sendAt: start - DAY,
         });
       }
+    }
+    // Aviso de check-in: 5 minutos antes de que abra
+    const ci = t.info && t.info.checkin;
+    if (ci && ci.has && ci.at) {
+      items.push({
+        id: `${t.id}_checkin`,
+        title: `Check-in en 5 min: ${t.name || 'tu viaje'}`,
+        body: `El check-in abre a las ${fmtDateTime(ci.at)}.`,
+        sendAt: toLocalDate(ci.at).getTime() - 5 * 60000,
+      });
     }
     for (const leg of (t.legs || [])) {
       if (!leg.datetime) continue;
