@@ -74,7 +74,7 @@ const store = {
           items.push({ id: it.id, name: it.name, qtyWanted: it.qtyWanted, qtyDone: it.qtyDone, status: it.status });
         }
       }
-      return { id: l.id, name: l.name, items };
+      return { id: l.id, name: l.name, items, collapsed: !!l.collapsed };
     });
     for (const t of this.data.trips) {
       t.lists = flatten(t.lists);
