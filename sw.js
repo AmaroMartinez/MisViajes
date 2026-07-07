@@ -1,6 +1,6 @@
 /* Service worker: solo cachea la app para uso offline (PWA).
    Las notificaciones ya no van por aquí: son locales nativas en la app de Android. */
-const CACHE = 'viajes-v21';
+const CACHE = 'viajes-v22';
 const ASSETS = [
   './',
   './index.html',

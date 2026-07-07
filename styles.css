@@ -287,6 +287,10 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--teal); f
 .kv-key, .kv-val { flex: 1 1 130px; min-width: 0; }
 .notes { width: 100%; resize: vertical; min-height: 90px; font-family: var(--body); }
 
+/* Viajes pasados (Home) */
+.past-toggle { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--muted); font-family: var(--mono); font-weight: 700; font-size: .78rem; letter-spacing: .06em; padding: 18px 4px 8px; cursor: pointer; }
+.past-grid { opacity: .62; }
+
 /* ============================================================
    Modo oscuro
    ============================================================ */

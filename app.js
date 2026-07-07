@@ -176,6 +176,7 @@ function countdown(iso, endIso) {
    ROUTER / ESTADO DE VISTA
    ============================================================ */
 const view = { name: 'home', tripId: null, templateId: null, tab: 'lists' };
+let showPast = false; // en Home: mostrar la sección de viajes pasados
 const app = $('#app');
 
 function go(name, opts = {}) {
@@ -217,40 +218,52 @@ function bottomNav(active) {
 }
 
 /* ---------- HOME: lista de viajes ---------- */
+// Un viaje es "pasado" si ya ha terminado (regreso, o salida si no hay regreso).
+function isTripPast(t) {
+  const now = Date.now();
+  if (t.endDate) return now > toLocalDate(t.endDate).getTime();
+  if (t.startDate) return now > toLocalDate(t.startDate).getTime();
+  return false;
+}
+function tripCard(t) {
+  const cd = countdown(t.startDate, t.endDate);
+  const pend = tripPendingCount(t);
+  const total = tripTotalCount(t);
+  return `<button class="trip-card" data-open-trip="${t.id}">
+    <div class="board">
+      <div class="board-row">
+        <span class="board-label">DESTINO</span>
+        <span class="board-dest">${esc(t.name || 'Sin nombre')}</span>
+      </div>
+      <div class="board-row">
+        <span class="board-label">SALIDA</span>
+        <span class="board-mono">${t.startDate ? fmtDateTime(t.startDate).toUpperCase() : '— — —'}</span>
+      </div>
+      <div class="board-row">
+        <span class="board-label">CUENTA ATRÁS</span>
+        <span class="board-count ${cd.past ? 'past' : ''}">${cd.text}</span>
+      </div>
+    </div>
+    <div class="trip-foot">
+      <span class="pill ${pend ? 'warn' : 'ok'}">${pend ? pend + ' pendientes' : 'Todo listo'}</span>
+      <span class="muted">${total} artículos · ${t.legs?.length || 0} trayectos</span>
+    </div>
+  </button>`;
+}
 function renderHome() {
-  const trips = [...store.data.trips].sort((a, b) =>
-    (a.startDate || '9999').localeCompare(b.startDate || '9999'));
-
-  const cards = trips.map((t) => {
-    const cd = countdown(t.startDate, t.endDate);
-    const pend = tripPendingCount(t);
-    const total = tripTotalCount(t);
-    return `<button class="trip-card" data-open-trip="${t.id}">
-      <div class="board">
-        <div class="board-row">
-          <span class="board-label">DESTINO</span>
-          <span class="board-dest">${esc(t.name || 'Sin nombre')}</span>
-        </div>
-        <div class="board-row">
-          <span class="board-label">SALIDA</span>
-          <span class="board-mono">${t.startDate ? fmtDateTime(t.startDate).toUpperCase() : '— — —'}</span>
-        </div>
-        <div class="board-row">
-          <span class="board-label">CUENTA ATRÁS</span>
-          <span class="board-count ${cd.past ? 'past' : ''}">${cd.text}</span>
-        </div>
-      </div>
-      <div class="trip-foot">
-        <span class="pill ${pend ? 'warn' : 'ok'}">${pend ? pend + ' pendientes' : 'Todo listo'}</span>
-        <span class="muted">${total} artículos · ${t.legs?.length || 0} trayectos</span>
-      </div>
-    </button>`;
-  }).join('');
+  const trips = store.data.trips;
+  const upcoming = trips.filter((t) => !isTripPast(t)).sort((a, b) => (a.startDate || '9999').localeCompare(b.startDate || '9999'));
+  const past = trips.filter(isTripPast).sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
 
   const empty = `<div class="empty">
       <p class="empty-title">Aún no hay viajes</p>
       <p class="muted">Crea tu primer viaje para preparar listas y trayectos.</p>
     </div>`;
+
+  const upcomingHtml = upcoming.length ? `<div class="grid">${upcoming.map(tripCard).join('')}</div>` : '';
+  const pastHtml = past.length ? `
+    <button class="past-toggle" data-toggle-past>${showPast ? '▾' : '▸'} Pasados (${past.length})</button>
+    ${showPast ? `<div class="grid past-grid">${past.map(tripCard).join('')}</div>` : ''}` : '';
 
   return `
   <header class="topbar">
@@ -258,7 +271,7 @@ function renderHome() {
     <button class="btn btn-primary" data-new-trip>+ Nuevo viaje</button>
   </header>
   <main class="wrap">
-    ${trips.length ? `<div class="grid">${cards}</div>` : empty}
+    ${trips.length ? `${upcomingHtml}${pastHtml}` : empty}
   </main>
   ${bottomNav('home')}`;
 }
@@ -348,6 +361,7 @@ function renderTrip() {
     <button class="btn ghost" data-nav="home">‹ Viajes</button>
     <div class="topbar-actions">
       <button class="btn ghost small" data-save-as-tpl>Guardar como plantilla</button>
+      <button class="icon-btn" data-duplicate-trip title="Duplicar viaje">⧉</button>
       <button class="icon-btn danger" data-del-trip="${t.id}" title="Borrar viaje">🗑</button>
     </div>
   </header>
@@ -491,7 +505,7 @@ function bindDynamic() {
 
 // Delegación global para clicks
 app.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-wipe],[data-toggle-list],[data-add-kv],[data-del-kv]');
+  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-wipe],[data-toggle-list],[data-add-kv],[data-del-kv],[data-duplicate-trip],[data-toggle-past]');
   if (!el) return;
   const d = el.dataset;
 
@@ -500,6 +514,8 @@ app.addEventListener('click', (e) => {
   if ('newTrip' in d) return createTripFlow();
   if ('newTpl' in d) return createTemplate();
   if ('tab' in d) { view.tab = d.tab; return render(); }
+  if ('togglePast' in d) { showPast = !showPast; return render(); }
+  if ('duplicateTrip' in d) return duplicateTrip();
 
   // Ajustes
   if ('setTheme' in d) { store.data.settings.theme = d.setTheme; store.save(); applyTheme(); return render(); }
@@ -687,6 +703,29 @@ function saveTripAsTemplate() {
   const tpl = { id: uid(), name: (t.name || 'Viaje') + ' (plantilla)', lists: cloneLists(t.lists, true) };
   store.data.templates.push(tpl); store.save();
   toast('Guardado como plantilla');
+}
+
+// Duplica el viaje listo para reusar: copia la estructura, resetea el progreso y vacía las fechas.
+function duplicateTrip() {
+  const t = currentTrip();
+  if (!t) return;
+  const lists = cloneLists(t.lists, true);
+  lists.forEach((l) => l.items.forEach((it) => { it.status = 'pending'; }));
+  const copy = {
+    id: uid(),
+    name: (t.name || 'Viaje') + ' (copia)',
+    startDate: '', endDate: '',
+    lists,
+    legs: (t.legs || []).map((l) => ({ id: uid(), type: l.type, name: l.name, datetime: '', notified1d: false, notified1h: false })),
+    info: {
+      checkin: { has: !!(t.info && t.info.checkin && t.info.checkin.has), at: '' },
+      fields: ((t.info && t.info.fields) || []).map((f) => ({ id: uid(), key: f.key, value: f.value })),
+      notes: (t.info && t.info.notes) || '',
+    },
+  };
+  store.data.trips.push(copy); store.save();
+  go('trip', { tripId: copy.id, tab: 'lists' });
+  toast('Viaje duplicado');
 }
 
 function saveTripAsTemplateFromLists() {} // reservado
