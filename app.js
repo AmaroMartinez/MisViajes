@@ -163,17 +163,27 @@ function fmtDateTime(iso) {
 function toLocalDate(iso) {
   return new Date(/T/.test(iso) ? iso : iso + 'T00:00:00');
 }
-// Cuenta atrás legible hasta una fecha
-function countdown(iso) {
+// Cuenta atrás legible hasta una fecha. Si se pasa endIso (regreso), al haber empezado
+// distingue "EN CURSO" (aún dentro del viaje) de "PASADO" (después del regreso).
+function countdown(iso, endIso) {
   if (!iso) return { text: 'SIN FECHA', past: false };
-  const ms = toLocalDate(iso).getTime() - Date.now();
-  if (ms <= 0) return { text: 'EN CURSO / PASADO', past: true };
-  const d = Math.floor(ms / DAY);
-  const h = Math.floor((ms % DAY) / HOUR);
-  const m = Math.floor((ms % HOUR) / 60000);
-  if (d > 0) return { text: `${d}D ${String(h).padStart(2, '0')}H`, past: false };
-  if (h > 0) return { text: `${h}H ${String(m).padStart(2, '0')}M`, past: false };
-  return { text: `${m}M`, past: false };
+  const now = Date.now();
+  const ms = toLocalDate(iso).getTime() - now;
+  if (ms > 0) {
+    const d = Math.floor(ms / DAY);
+    const h = Math.floor((ms % DAY) / HOUR);
+    const m = Math.floor((ms % HOUR) / 60000);
+    if (d > 0) return { text: `${d}D ${String(h).padStart(2, '0')}H`, past: false };
+    if (h > 0) return { text: `${h}H ${String(m).padStart(2, '0')}M`, past: false };
+    return { text: `${m}M`, past: false };
+  }
+  // Ya ha empezado
+  if (endIso) {
+    const endOfReturnDay = toLocalDate(endIso).getTime() + DAY; // el día de regreso cuenta entero
+    if (now < endOfReturnDay) return { text: 'EN CURSO', past: false };
+    return { text: 'PASADO', past: true };
+  }
+  return { text: 'EN CURSO / PASADO', past: true };
 }
 
 /* ============================================================
@@ -226,7 +236,7 @@ function renderHome() {
     (a.startDate || '9999').localeCompare(b.startDate || '9999'));
 
   const cards = trips.map((t) => {
-    const cd = countdown(t.startDate);
+    const cd = countdown(t.startDate, t.endDate);
     const pend = tripPendingCount(t);
     const total = tripTotalCount(t);
     return `<button class="trip-card" data-open-trip="${t.id}">
@@ -313,7 +323,7 @@ function renderTemplateEditor() {
 /* ---------- VIAJE ---------- */
 function renderTrip() {
   const t = currentTrip();
-  const cd = countdown(t.startDate);
+  const cd = countdown(t.startDate, t.endDate);
   const pend = tripPendingCount(t);
 
   const header = `
@@ -563,7 +573,7 @@ function updateBoards() {
   if (!t) return;
   const cdEl = $('.tb-count');
   if (cdEl) {
-    const cd = countdown(t.startDate);
+    const cd = countdown(t.startDate, t.endDate);
     cdEl.textContent = cd.text; cdEl.classList.toggle('past', cd.past);
   }
   // Recalcular las cuentas atrás de los trayectos visibles (p. ej. al poner su fecha)
