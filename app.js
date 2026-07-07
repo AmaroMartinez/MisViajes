@@ -77,7 +77,11 @@ const store = {
       }
       return { id: l.id, name: l.name, items };
     });
-    for (const t of this.data.trips) t.lists = flatten(t.lists);
+    for (const t of this.data.trips) {
+      t.lists = flatten(t.lists);
+      // La salida ahora es fecha+hora: convierte fechas antiguas (solo día) a las 00:00
+      if (t.startDate && /^\d{4}-\d{2}-\d{2}$/.test(t.startDate)) t.startDate += 'T00:00';
+    }
     for (const t of this.data.templates) t.lists = flatten(t.lists);
   },
   seedTemplates() {
@@ -247,7 +251,7 @@ function renderHome() {
         </div>
         <div class="board-row">
           <span class="board-label">SALIDA</span>
-          <span class="board-mono">${t.startDate ? fmtDate(t.startDate).toUpperCase() : '— — —'}</span>
+          <span class="board-mono">${t.startDate ? fmtDateTime(t.startDate).toUpperCase() : '— — —'}</span>
         </div>
         <div class="board-row">
           <span class="board-label">CUENTA ATRÁS</span>
@@ -332,7 +336,7 @@ function renderTrip() {
       <input class="tb-dest" data-trip-name value="${esc(t.name)}" placeholder="¿A dónde vas?"></div>
     <div class="tb-dates">
       <label class="tb-date"><span>SALIDA</span>
-        <input type="date" data-trip-start value="${t.startDate || ''}"></label>
+        <input type="datetime-local" data-trip-start value="${t.startDate || ''}"></label>
       <label class="tb-date"><span>REGRESO</span>
         <input type="date" data-trip-end value="${t.endDate || ''}"></label>
     </div>
@@ -707,7 +711,7 @@ function buildReminders() {
   const items = [];
   for (const t of store.data.trips) {
     if (t.startDate) {
-      const start = new Date(t.startDate + 'T00:00:00').getTime();
+      const start = toLocalDate(t.startDate).getTime();
       if (start > now) {
         const pend = tripPendingCount(t);
         const name = t.name || 'tu viaje';

@@ -33,7 +33,7 @@ En la **PWA (iOS/escritorio) no hay notificaciones**: la pestaña Avisos muestra
 ### Lógica (en `app.js`)
 
 - `isNative()` — detecta si corre dentro de la APK (Capacitor).
-- `buildReminders()` — genera el calendario de avisos futuros según los **ajustes**: avisos de equipaje 2 días y/o 1 día antes de cada viaje (activables por separado), y un aviso de trayecto a la antelación elegida (30 min – 3 h, por defecto 1 h). Cada aviso es `{ id, title, body, sendAt }`.
+- `buildReminders()` — genera el calendario de avisos futuros según los **ajustes**: avisos de equipaje **48 h y/o 24 h** antes de la **fecha y hora de salida** del viaje (activables por separado), y un aviso de trayecto a la antelación elegida (30 min – 3 h, por defecto 1 h). Cada aviso es `{ id, title, body, sendAt }`. Solo se programan avisos **futuros** (`sendAt > now`): si el momento ya pasó, no se envía.
 - `enableNotifications()` — pide permiso (Android 13+) y guarda `viajes_notif = 'on'`.
 - `syncReminders()` — cancela los avisos pendientes y reprograma todos los futuros con `LocalNotifications.schedule`.
 - `scheduleReminderSync()` — versión con retardo (1,5 s); se llama al cambiar fechas o borrar/crear viajes y trayectos.
@@ -88,7 +88,7 @@ La pestaña inferior **Ajustes** (`renderSettings()`) reúne:
 // clave 'viajes_app_v1'
 {
   trips: [{
-    id, name, startDate, endDate,
+    id, name, startDate, endDate,   // startDate = fecha+hora (datetime-local); endDate = fecha
     lists: [{ id, name, items: [{ id, name, qtyWanted, qtyDone, status }] }],  // 2 niveles: lista → artículo
     legs: [{ id, type, name, datetime }]
   }],
