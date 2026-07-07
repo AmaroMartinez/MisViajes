@@ -204,7 +204,10 @@ input, select, button { font-family: inherit; }
 .leg-type { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font-size: .82rem; font-weight: 600; background: #fff; }
 .leg-name { flex: 1 1 120px; min-width: 100px; border: none; border-bottom: 1px solid var(--line-2); background: transparent; padding: 4px 2px; font-weight: 600; }
 .leg-name:focus { outline: none; border-bottom-color: var(--teal); }
-.leg-dt { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-family: var(--mono); font-size: .8rem; flex: 1 1 180px; }
+.leg-dt {
+  background: var(--line-2); border: 1px solid var(--line); color: inherit;
+  border-radius: 8px; padding: 8px; font-family: var(--mono); font-size: .82rem; flex: 1 1 180px;
+}
 .leg-count { font-family: var(--mono); font-weight: 700; color: var(--teal); font-size: .9rem; }
 .leg-count.past { color: var(--muted); }
 
@@ -286,3 +289,4 @@ body[data-theme="dark"] .item.is-done { background: #14241C; border-color: #2440
 body[data-theme="dark"] .icon-btn.danger:hover { background: #3A211E; }
 body[data-theme="dark"] .pill.warn { background: #3A2E14; }
 body[data-theme="dark"] .pill.ok { background: #14301F; }
+body[data-theme="dark"] .leg-dt { color-scheme: dark; }
