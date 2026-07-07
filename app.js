@@ -360,8 +360,7 @@ function renderTrip() {
   <header class="topbar">
     <button class="btn ghost" data-nav="home">‹ Viajes</button>
     <div class="topbar-actions">
-      <button class="btn ghost small" data-save-as-tpl>Guardar como plantilla</button>
-      <button class="icon-btn" data-duplicate-trip title="Duplicar viaje">⧉</button>
+      <button class="icon-btn" data-trip-actions title="Duplicar o guardar como plantilla">⧉</button>
       <button class="icon-btn danger" data-del-trip="${t.id}" title="Borrar viaje">🗑</button>
     </div>
   </header>
@@ -505,7 +504,7 @@ function bindDynamic() {
 
 // Delegación global para clicks
 app.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-wipe],[data-toggle-list],[data-add-kv],[data-del-kv],[data-duplicate-trip],[data-toggle-past]');
+  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-wipe],[data-toggle-list],[data-add-kv],[data-del-kv],[data-trip-actions],[data-toggle-past]');
   if (!el) return;
   const d = el.dataset;
 
@@ -515,7 +514,7 @@ app.addEventListener('click', (e) => {
   if ('newTpl' in d) return createTemplate();
   if ('tab' in d) { view.tab = d.tab; return render(); }
   if ('togglePast' in d) { showPast = !showPast; return render(); }
-  if ('duplicateTrip' in d) return duplicateTrip();
+  if ('tripActions' in d) return tripActionsSheet();
 
   // Ajustes
   if ('setTheme' in d) { store.data.settings.theme = d.setTheme; store.save(); applyTheme(); return render(); }
@@ -703,6 +702,15 @@ function saveTripAsTemplate() {
   const tpl = { id: uid(), name: (t.name || 'Viaje') + ' (plantilla)', lists: cloneLists(t.lists, true) };
   store.data.templates.push(tpl); store.save();
   toast('Guardado como plantilla');
+}
+
+// Menú del botón ⧉: elegir entre duplicar el viaje o guardarlo como plantilla.
+function tripActionsSheet() {
+  openSheet('Reutilizar viaje', 'Elige qué quieres hacer', [
+    { label: 'Duplicar viaje', kind: 'primary', action: () => { closeSheet(); duplicateTrip(); } },
+    { label: 'Guardar como plantilla', kind: 'default', action: () => { closeSheet(); saveTripAsTemplate(); } },
+    { label: 'Cancelar', kind: 'ghost', action: closeSheet },
+  ]);
 }
 
 // Duplica el viaje listo para reusar: copia la estructura, resetea el progreso y vacía las fechas.
