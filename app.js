@@ -547,7 +547,14 @@ app.addEventListener('click', (e) => {
     return saveRender();
   }
   if ('addKv' in d) { currentTrip().info.fields.push({ id: uid(), key: '', value: '' }); return saveRender(); }
-  if (d.delKv) { const inf = currentTrip().info; inf.fields = inf.fields.filter((f) => f.id !== d.delKv); return saveRender(); }
+  if (d.delKv) {
+    const inf = currentTrip().info;
+    const idx = inf.fields.findIndex((f) => f.id === d.delKv);
+    if (idx < 0) return;
+    const [removed] = inf.fields.splice(idx, 1);
+    saveRender();
+    return toastUndo('Dato borrado', () => { inf.fields.splice(idx, 0, removed); saveRender(); });
+  }
   if ('saveAsTpl' in d) return saveTripAsTemplate();
 
   // Steppers de cantidad
