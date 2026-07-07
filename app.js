@@ -79,8 +79,9 @@ const store = {
     });
     for (const t of this.data.trips) {
       t.lists = flatten(t.lists);
-      // La salida ahora es fecha+hora: convierte fechas antiguas (solo día) a las 00:00
+      // Salida y regreso ahora llevan hora: fechas antiguas (solo día) → salida 00:00, regreso 23:59
       if (t.startDate && /^\d{4}-\d{2}-\d{2}$/.test(t.startDate)) t.startDate += 'T00:00';
+      if (t.endDate && /^\d{4}-\d{2}-\d{2}$/.test(t.endDate)) t.endDate += 'T23:59';
     }
     for (const t of this.data.templates) t.lists = flatten(t.lists);
   },
@@ -177,14 +178,13 @@ function countdown(iso, endIso) {
     const d = Math.floor(ms / DAY);
     const h = Math.floor((ms % DAY) / HOUR);
     const m = Math.floor((ms % HOUR) / 60000);
-    if (d > 0) return { text: `${d}D ${String(h).padStart(2, '0')}H`, past: false };
+    if (d > 0) return { text: `${d}D ${String(h).padStart(2, '0')}H ${String(m).padStart(2, '0')}M`, past: false };
     if (h > 0) return { text: `${h}H ${String(m).padStart(2, '0')}M`, past: false };
     return { text: `${m}M`, past: false };
   }
-  // Ya ha empezado
+  // Ya ha empezado. Con fecha+hora de regreso distinguimos en curso (hasta ese momento) de pasado.
   if (endIso) {
-    const endOfReturnDay = toLocalDate(endIso).getTime() + DAY; // el día de regreso cuenta entero
-    if (now < endOfReturnDay) return { text: 'EN CURSO', past: false };
+    if (now < toLocalDate(endIso).getTime()) return { text: 'EN CURSO', past: false };
     return { text: 'PASADO', past: true };
   }
   return { text: 'EN CURSO / PASADO', past: true };
@@ -338,7 +338,7 @@ function renderTrip() {
       <label class="tb-date"><span>SALIDA</span>
         <input type="datetime-local" data-trip-start value="${t.startDate || ''}"></label>
       <label class="tb-date"><span>REGRESO</span>
-        <input type="date" data-trip-end value="${t.endDate || ''}"></label>
+        <input type="datetime-local" data-trip-end value="${t.endDate || ''}"></label>
     </div>
     <div class="tb-count ${cd.past ? 'past' : ''}">${cd.text}</div>
     <div class="tb-status">${pend ? `<span class="pill warn">${pend} pendientes</span>` : `<span class="pill ok">Todo listo</span>`}</div>
@@ -542,7 +542,7 @@ app.addEventListener('input', (e) => {
   const el = e.target, d = el.dataset;
   if ('tripName' in d) { currentTrip().name = el.value; store.save(); return updateBoards(); }
   if ('tripStart' in d) { currentTrip().startDate = el.value; resetTripFlags(); store.save(); return updateBoards(); }
-  if ('tripEnd' in d) { currentTrip().endDate = el.value; store.save(); return; }
+  if ('tripEnd' in d) { currentTrip().endDate = el.value; store.save(); return updateBoards(); }
   if ('tplName' in d) { currentTemplate().name = el.value; store.save(); return; }
 
   if ('listName' in d) { findList(d.listName).name = el.value; store.save(); return; }
@@ -845,20 +845,27 @@ async function notifTest() {
     toast('Te llegará en ~5 segundos');
   } catch (e) { toast('No se pudo programar el aviso'); }
 }
-// Exporta todos los datos (viajes, plantillas y ajustes) a un .json y al portapapeles.
-function exportData() {
+// Exporta todos los datos (viajes, plantillas y ajustes) a un archivo .json.
+async function exportData() {
   const json = JSON.stringify(store.data, null, 2);
   const filename = `mis-viajes-${new Date().toISOString().slice(0, 10)}.json`;
-  try {
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  } catch (e) { /* algunos WebView no descargan; queda el portapapeles */ }
-  if (navigator.clipboard) navigator.clipboard.writeText(json).catch(() => {});
-  toast('Datos exportados (descarga y portapapeles)');
+  const P = window.Capacitor?.Plugins;
+  if (isNative() && P?.Filesystem && P?.Share) {
+    // App nativa: guarda el archivo y abre el diálogo de guardar/compartir
+    try {
+      const res = await P.Filesystem.writeFile({ path: filename, data: json, directory: 'CACHE', encoding: 'utf8' });
+      await P.Share.share({ title: filename, url: res.uri, dialogTitle: 'Guardar copia de seguridad' });
+    } catch (e) { console.error('export:', e); toast('No se pudo exportar'); }
+    return;
+  }
+  // Web/PWA: descarga directa del archivo
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('Copia descargada');
 }
 // Importa un .json previamente exportado, reemplazando todos los datos.
 function importData(input) {
@@ -947,8 +954,8 @@ function renderSettings() {
     <section class="set-card">
       <div class="set-head">Copia de seguridad</div>
       <p class="muted">Exporta todos tus viajes, plantillas y ajustes a un archivo, e impórtalo para restaurarlo.</p>
-      <button class="btn wide" data-export>Exportar datos</button>
-      <label class="btn wide ghost import-btn">Importar datos
+      <button class="btn wide import-btn" data-export>Exportar datos</button>
+      <label class="btn wide import-btn">Importar datos
         <input type="file" accept="application/json,.json" data-import hidden>
       </label>
     </section>
