@@ -30,6 +30,13 @@ jobs:
       - name: Sincronizar web + plugins
         run: npx cap sync android
 
+      - name: Permitir alarmas exactas (avisos puntuales aunque el móvil esté dormido)
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          grep -q 'USE_EXACT_ALARM' "$MANIFEST" || \
+            sed -i 's#<application#<uses-permission android:name="android.permission.USE_EXACT_ALARM" />\n    <application#' "$MANIFEST"
+          echo "--- Permisos en el manifest ---"; grep -i 'uses-permission' "$MANIFEST" || true
+
       - name: Generar iconos y splash (con el icono de Mis Viajes)
         run: npx capacitor-assets generate --android --iconBackgroundColor '#16212E' --iconBackgroundColorDark '#16212E'
 

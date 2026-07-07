@@ -49,7 +49,7 @@ La APK se compila **en la nube** (no hace falta Android Studio local):
 2. Al terminar, en la ejecución, sección **Artifacts**, descargar **`MisViajes-apk`** → contiene `MisViajes.apk`.
 3. Instalar en el móvil (permitir "instalar apps de origen desconocido").
 
-El workflow: instala Node + JDK 17 + Android SDK, ejecuta `npx cap add android`, `npx cap sync`, genera los iconos con `@capacitor/assets` y compila con Gradle (`assembleDebug`).
+El workflow: instala Node + JDK 17 + Android SDK, ejecuta `npx cap add android`, `npx cap sync`, **añade el permiso `USE_EXACT_ALARM`** al manifest (para que los avisos salten puntuales en Android 12+ aunque el móvil esté dormido), genera los iconos con `@capacitor/assets` y compila con Gradle (`assembleDebug`).
 
 > ⚠️ Firma: la APK se firma con la clave "debug", que **cambia entre compilaciones**. Por eso, al instalar una versión nueva puede pedir **desinstalar la anterior** (y se perderían los viajes guardados en esa APK). Para actualizaciones sin desinstalar, habría que firmar con una **clave fija** guardada como secreto en GitHub (pendiente).
 
