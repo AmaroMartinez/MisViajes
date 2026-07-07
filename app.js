@@ -358,7 +358,6 @@ function renderTrip() {
   <header class="topbar">
     <button class="btn ghost" data-nav="home">‹ Viajes</button>
     <div class="topbar-actions">
-      <button class="icon-btn" data-refresh title="Actualizar tiempos">↻</button>
       <button class="btn ghost small" data-save-as-tpl>Guardar como plantilla</button>
       <button class="icon-btn danger" data-del-trip="${t.id}" title="Borrar viaje">🗑</button>
     </div>
@@ -469,7 +468,7 @@ function bindDynamic() {
 
 // Delegación global para clicks
 app.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-refresh]');
+  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export]');
   if (!el) return;
   const d = el.dataset;
 
@@ -484,7 +483,6 @@ app.addEventListener('click', (e) => {
   if ('notifToggle' in d) return toggleNotifications();
   if ('notifTest' in d) return notifTest();
   if ('export' in d) return exportData();
-  if ('refresh' in d) { render(); return toast('Tiempos actualizados'); }
 
   if (d.delTrip) return confirmDelete('¿Borrar este viaje y todas sus listas?', () => {
     store.data.trips = store.data.trips.filter((x) => x.id !== d.delTrip);
@@ -497,8 +495,23 @@ app.addEventListener('click', (e) => {
 
   const t = currentTrip() || currentTemplate();
 
-  if (d.delList) { removeList(d.delList); return saveRender(); }
-  if (d.delItem) { const [l, i] = d.delItem.split(':'); removeItem(l, i); return saveRender(); }
+  if (d.delList) {
+    const c = container();
+    const idx = c.lists.findIndex((l) => l.id === d.delList);
+    if (idx < 0) return;
+    const [removed] = c.lists.splice(idx, 1);
+    saveRender();
+    return toastUndo('Lista borrada', () => { c.lists.splice(idx, 0, removed); saveRender(); });
+  }
+  if (d.delItem) {
+    const [lid, iid] = d.delItem.split(':');
+    const list = findList(lid);
+    const idx = list.items.findIndex((i) => i.id === iid);
+    if (idx < 0) return;
+    const [removed] = list.items.splice(idx, 1);
+    saveRender();
+    return toastUndo('Artículo borrado', () => { list.items.splice(idx, 0, removed); saveRender(); });
+  }
   if (d.delLeg) { const tr = currentTrip(); tr.legs = tr.legs.filter((x) => x.id !== d.delLeg); scheduleReminderSync(); return saveRender(); }
 
   if ('addList' in d || 'addListTpl' in d) { t.lists.push(newList()); return saveRender(); }
@@ -665,6 +678,19 @@ function toast(msg) {
   document.body.appendChild(el);
   setTimeout(() => el.classList.add('show'), 10);
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2200);
+}
+// Toast con botón "Deshacer" durante unos segundos
+function toastUndo(msg, onUndo) {
+  $$('.toast').forEach((e) => e.remove());
+  const el = document.createElement('div');
+  el.className = 'toast toast-undo';
+  el.innerHTML = `<span></span><button class="toast-btn">Deshacer</button>`;
+  el.querySelector('span').textContent = msg;
+  const close = () => { clearTimeout(timer); el.classList.remove('show'); setTimeout(() => el.remove(), 300); };
+  el.querySelector('.toast-btn').onclick = () => { close(); onUndo(); };
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('show'), 10);
+  const timer = setTimeout(close, 5000);
 }
 
 /* ============================================================
@@ -941,8 +967,35 @@ function boot() {
   if (isNative()) {
     syncReminders();
     document.addEventListener('visibilitychange', () => { if (!document.hidden) syncReminders(); });
+    // Gesto/botón "atrás" de Android: no salir de la app. Si hay una hoja abierta, se cierra.
+    const capApp = window.Capacitor?.Plugins?.App;
+    if (capApp) capApp.addListener('backButton', () => { if ($('.sheet-backdrop')) closeSheet(); });
   }
+  setupPullToRefresh();
   // Cerrar hojas con Escape
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
+}
+
+// Deslizar hacia abajo desde arriba para refrescar (recalcula cuentas atrás).
+function setupPullToRefresh() {
+  const ind = document.createElement('div');
+  ind.className = 'ptr-indicator';
+  document.body.appendChild(ind);
+  let startY = null, ready = false;
+  window.addEventListener('touchstart', (e) => {
+    startY = (window.scrollY <= 0 && e.touches.length === 1) ? e.touches[0].clientY : null;
+    ready = false;
+  }, { passive: true });
+  window.addEventListener('touchmove', (e) => {
+    if (startY == null) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy > 60 && window.scrollY <= 0) { ready = true; ind.textContent = '↑ Suelta para actualizar'; ind.classList.add('show'); }
+    else if (dy < 20) { ready = false; ind.classList.remove('show'); }
+  }, { passive: true });
+  window.addEventListener('touchend', () => {
+    ind.classList.remove('show');
+    if (ready) { render(); toast('Actualizado'); }
+    startY = null; ready = false;
+  }, { passive: true });
 }
 boot();

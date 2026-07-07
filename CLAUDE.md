@@ -16,7 +16,7 @@ Mis Viajes/
 ├── manifest.webmanifest             # Manifest de la PWA
 ├── icons/                           # Iconos de la PWA
 ├── capacitor.config.json            # Config de la APK (appId, appName, server.url)
-├── package.json                     # Capacitor + plugin de notificaciones locales
+├── package.json                     # Capacitor + plugins (local-notifications, app)
 ├── assets/icon.png                  # Icono fuente (1024px) para generar los de Android
 └── .github/workflows/
     └── build-android.yml            # Compila la APK en la nube y la publica como artefacto
@@ -66,6 +66,12 @@ El workflow: instala Node + JDK 17 + Android SDK, ejecuta `npx cap add android`,
 | Android | APK (Capacitor) | ✅ locales, fiables en segundo plano |
 | iOS | PWA instalada | ❌ (decisión de diseño) |
 | Escritorio | PWA | ❌ |
+
+## Interacciones
+
+- **Deslizar hacia abajo** desde arriba recalcula las cuentas atrás (`setupPullToRefresh()`); el refresco nativo del navegador se desactiva con `overscroll-behavior-y: contain`.
+- **Borrar lista o artículo** muestra un toast con **Deshacer** (`toastUndo`) durante 5 s que restaura el elemento en su posición.
+- **Android**: el gesto/botón **atrás** no cierra la app (plugin `@capacitor/app`); si hay una hoja abierta, la cierra. Requiere **recompilar la APK** (cambio nativo).
 
 ## Pantalla de Ajustes
 

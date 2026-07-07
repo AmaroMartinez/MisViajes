@@ -35,7 +35,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; overscroll-behavior-y: contain; }
 body {
   font-family: var(--body);
   background: var(--paper);
@@ -242,6 +242,17 @@ input, select, button { font-family: inherit; }
 
 .toast { position: fixed; left: 50%; bottom: 96px; transform: translate(-50%, 12px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: .86rem; font-weight: 600; opacity: 0; transition: opacity .25s, transform .25s; z-index: 60; box-shadow: var(--shadow); }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast-undo { display: flex; align-items: center; gap: 14px; }
+.toast-btn { background: none; border: none; color: var(--amber); font-weight: 700; font-size: .86rem; cursor: pointer; padding: 0; }
+
+/* Indicador de "deslizar para actualizar" */
+.ptr-indicator {
+  position: fixed; top: 0; left: 50%; transform: translate(-50%, -40px);
+  background: var(--teal); color: #fff; padding: 8px 16px; border-radius: 0 0 12px 12px;
+  font-size: .82rem; font-weight: 600; z-index: 60; opacity: 0;
+  transition: opacity .2s, transform .2s;
+}
+.ptr-indicator.show { opacity: 1; transform: translate(-50%, 0); }
 
 @keyframes fade { from { opacity: 0; } }
 @keyframes slideup { from { transform: translateY(16px); opacity: .6; } }
