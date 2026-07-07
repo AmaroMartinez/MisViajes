@@ -826,7 +826,10 @@ async function notifTest() {
 // Exporta todos los datos (viajes, plantillas y ajustes) a un archivo .json.
 async function exportData() {
   const json = JSON.stringify(store.data, null, 2);
-  const filename = `mis-viajes-${new Date().toISOString().slice(0, 10)}.json`;
+  const n = new Date();
+  const p = (x) => String(x).padStart(2, '0');
+  const stamp = `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}_${p(n.getHours())}-${p(n.getMinutes())}-${p(n.getSeconds())}`;
+  const filename = `mis-viajes-${stamp}.json`;
   const P = window.Capacitor?.Plugins;
   if (isNative() && P?.Filesystem) {
     // App nativa: guarda el archivo directamente en la carpeta Documentos (sin diálogo de compartir)
