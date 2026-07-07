@@ -214,7 +214,7 @@ function bottomNav(active) {
        <span class="nav-ico">${icon}</span><span>${label}</span>
      </button>`;
   return `<nav class="bottomnav">
-    ${item('home', 'Viajes', '⌂')}
+    ${item('home', 'Viajes', '✈')}
     ${item('templates', 'Plantillas', '❑')}
     ${item('settings', 'Ajustes', '⚙')}
   </nav>`;
@@ -348,6 +348,7 @@ function renderTrip() {
   <header class="topbar">
     <button class="btn ghost" data-nav="home">‹ Viajes</button>
     <div class="topbar-actions">
+      <button class="icon-btn" data-refresh title="Actualizar tiempos">↻</button>
       <button class="btn ghost small" data-save-as-tpl>Guardar como plantilla</button>
       <button class="icon-btn danger" data-del-trip="${t.id}" title="Borrar viaje">🗑</button>
     </div>
@@ -458,7 +459,7 @@ function bindDynamic() {
 
 // Delegación global para clicks
 app.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export]');
+  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-refresh]');
   if (!el) return;
   const d = el.dataset;
 
@@ -473,6 +474,7 @@ app.addEventListener('click', (e) => {
   if ('notifToggle' in d) return toggleNotifications();
   if ('notifTest' in d) return notifTest();
   if ('export' in d) return exportData();
+  if ('refresh' in d) { render(); return toast('Tiempos actualizados'); }
 
   if (d.delTrip) return confirmDelete('¿Borrar este viaje y todas sus listas?', () => {
     store.data.trips = store.data.trips.filter((x) => x.id !== d.delTrip);
@@ -563,6 +565,14 @@ function updateBoards() {
   if (cdEl) {
     const cd = countdown(t.startDate);
     cdEl.textContent = cd.text; cdEl.classList.toggle('past', cd.past);
+  }
+  // Recalcular las cuentas atrás de los trayectos visibles (p. ej. al poner su fecha)
+  for (const leg of (t.legs || [])) {
+    const el = $(`.leg[data-leg="${leg.id}"] .leg-count`);
+    if (el) {
+      const cd = countdown(leg.datetime);
+      el.textContent = cd.text; el.classList.toggle('past', cd.past);
+    }
   }
 }
 function resetTripFlags() {

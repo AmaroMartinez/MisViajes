@@ -165,6 +165,8 @@ input, select, button { font-family: inherit; }
 .item-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .item-name { flex: 1 1 120px; min-width: 100px; border: none; background: transparent; font-weight: 600; font-size: .95rem; padding: 4px 2px; }
 .item-name:focus { outline: none; background: var(--line-2); border-radius: 6px; }
+/* Inputs/botones de texto: heredan el color del tema (legibles en claro y oscuro) */
+.list-title, .item-name, .leg-name, .leg-dt, .tpl-open, .tpl-name { color: inherit; }
 .add-item { margin-top: 4px; }
 
 /* ---------- Estado (select) ---------- */
