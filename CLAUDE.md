@@ -79,7 +79,7 @@ La pestaña inferior **Ajustes** (`renderSettings()`) reúne:
 - **Notificaciones** (solo Android): activar/desactivar y aviso de prueba.
 - **Avisos de trayecto** (solo Android): antelación 30 min – 3 h.
 - **Avisos de equipaje** (solo Android): activar 2 días / 1 día antes por separado.
-- **Apariencia**: tema **claro** (por defecto) u **oscuro** (`body[data-theme="dark"]` en CSS; `applyTheme()` lo aplica al arrancar).
+- **Apariencia**: tema **automático** (por defecto, sigue el `prefers-color-scheme` del sistema y cambia en vivo), **claro** u **oscuro**. `applyTheme()` resuelve "auto" a light/dark y pone `body[data-theme]`.
 - **Copia de seguridad**: `exportData()` **descarga** un `.json` con todo (viajes, plantillas y ajustes) — en web descarga directa; en la APK lo guarda en la carpeta **Documentos** con `@capacitor/filesystem`; `importData()` restaura desde un `.json` elegido con el selector de archivos.
 
 ## Modelo de datos (`localStorage`)

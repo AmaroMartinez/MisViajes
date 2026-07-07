@@ -52,7 +52,7 @@ const store = {
     if (!this.data.templates) this.data.templates = [];
     // Ajustes con valores por defecto (se conservan al exportar/importar)
     this.data.settings = Object.assign(
-      { theme: 'light', legLeadMin: 60, packing2d: true, packing1d: true },
+      { theme: 'auto', legLeadMin: 60, packing2d: true, packing1d: true },
       this.data.settings || {}
     );
     this.migrate();
@@ -924,9 +924,14 @@ async function disableNotifications() {
 /* ============================================================
    AVISOS (hoja de ajustes)
    ============================================================ */
-/* ---------- Tema (claro/oscuro) ---------- */
+/* ---------- Tema (claro/oscuro/automático) ---------- */
+function systemPrefersDark() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
 function applyTheme() {
-  document.body.dataset.theme = (store.data.settings && store.data.settings.theme) || 'light';
+  const pref = (store.data.settings && store.data.settings.theme) || 'auto';
+  const dark = pref === 'dark' || (pref === 'auto' && systemPrefersDark());
+  document.body.dataset.theme = dark ? 'dark' : 'light';
 }
 
 /* ---------- Acciones de ajustes ---------- */
@@ -983,7 +988,7 @@ function importData(input) {
       if (!data || !Array.isArray(data.trips) || !Array.isArray(data.templates)) throw new Error('formato');
       store.data = data;
       store.data.settings = Object.assign(
-        { theme: 'light', legLeadMin: 60, packing2d: true, packing1d: true },
+        { theme: 'auto', legLeadMin: 60, packing2d: true, packing1d: true },
         store.data.settings || {}
       );
       store.migrate();
@@ -1064,6 +1069,7 @@ function renderSettings() {
       <div class="set-row">
         <span class="set-label">Tema</span>
         <div class="seg">
+          <button class="seg-btn ${s.theme === 'auto' ? 'is-active' : ''}" data-set-theme="auto">Auto</button>
           <button class="seg-btn ${s.theme === 'light' ? 'is-active' : ''}" data-set-theme="light">Claro</button>
           <button class="seg-btn ${s.theme === 'dark' ? 'is-active' : ''}" data-set-theme="dark">Oscuro</button>
         </div>
@@ -1093,6 +1099,12 @@ function renderSettings() {
 function boot() {
   store.load();
   applyTheme();
+  // En modo "automático", seguir los cambios de tema del sistema en vivo
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (((store.data.settings && store.data.settings.theme) || 'auto') === 'auto') applyTheme();
+    });
+  }
   go('home');
   // Service worker (solo para caché offline de la PWA)
   if ('serviceWorker' in navigator) {
