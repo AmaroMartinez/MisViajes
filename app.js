@@ -354,16 +354,17 @@ function renderListsBlock(lists, { context }) {
   }
   return lists.map((l) => {
     const pend = context === 'trip' ? l.items.filter(nodePending).length : 0;
-    return `<section class="list-card" data-list="${l.id}">
+    return `<section class="list-card ${l.collapsed ? 'is-collapsed' : ''}" data-list="${l.id}">
       <div class="list-head">
+        <button class="list-fold" data-toggle-list="${l.id}" title="Plegar / desplegar">${l.collapsed ? '▸' : '▾'}</button>
         <input class="list-title" data-list-name="${l.id}" value="${esc(l.name)}" placeholder="Nombre de la lista">
         ${context === 'trip' && pend ? `<span class="pill warn tiny">${pend}</span>` : ''}
         <button class="icon-btn danger" data-del-list="${l.id}" title="Borrar lista">✕</button>
       </div>
-      <div class="items">
+      ${l.collapsed ? '' : `<div class="items">
         ${l.items.map((it) => renderItem(l.id, it, context)).join('')}
       </div>
-      <button class="btn ghost small add-item" data-add-item="${l.id}">+ Artículo</button>
+      <button class="btn ghost small add-item" data-add-item="${l.id}">+ Artículo</button>`}
     </section>`;
   }).join('');
 }
@@ -445,7 +446,7 @@ function bindDynamic() {
 
 // Delegación global para clicks
 app.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-wipe]');
+  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-wipe],[data-toggle-list]');
   if (!el) return;
   const d = el.dataset;
 
@@ -473,6 +474,7 @@ app.addEventListener('click', (e) => {
 
   const t = currentTrip() || currentTemplate();
 
+  if (d.toggleList) { const l = findList(d.toggleList); l.collapsed = !l.collapsed; return saveRender(); }
   if (d.delList) {
     const c = container();
     const idx = c.lists.findIndex((l) => l.id === d.delList);
@@ -552,6 +554,8 @@ function adjustQty(ids, field, delta) {
   const node = findItem(lid, iid);
   node[field] = clampInt(node[field] + delta);
   if (node.qtyDone > node.qtyWanted && field === 'qtyDone') node.qtyWanted = node.qtyDone;
+  // Objetivo a 0: no hace falta nada → en maleta a 0 y marcado como listo
+  if (field === 'qtyWanted' && node.qtyWanted === 0) { node.qtyDone = 0; node.status = 'ready'; }
   // Autocompletar estado: si ya está todo metido, marcar listo
   if (field === 'qtyDone' && node.qtyDone >= node.qtyWanted && node.qtyWanted > 0) node.status = 'ready';
 }
