@@ -824,12 +824,12 @@ async function exportData() {
   const json = JSON.stringify(store.data, null, 2);
   const filename = `mis-viajes-${new Date().toISOString().slice(0, 10)}.json`;
   const P = window.Capacitor?.Plugins;
-  if (isNative() && P?.Filesystem && P?.Share) {
-    // App nativa: guarda el archivo y abre el diálogo de guardar/compartir
+  if (isNative() && P?.Filesystem) {
+    // App nativa: guarda el archivo directamente en la carpeta Documentos (sin diálogo de compartir)
     try {
-      const res = await P.Filesystem.writeFile({ path: filename, data: json, directory: 'CACHE', encoding: 'utf8' });
-      await P.Share.share({ title: filename, url: res.uri, dialogTitle: 'Guardar copia de seguridad' });
-    } catch (e) { console.error('export:', e); toast('No se pudo exportar'); }
+      await P.Filesystem.writeFile({ path: filename, data: json, directory: 'DOCUMENTS', encoding: 'utf8', recursive: true });
+      toast('Guardado en Documentos: ' + filename);
+    } catch (e) { console.error('export:', e); toast('No se pudo guardar el archivo'); }
     return;
   }
   // Web/PWA: descarga directa del archivo
