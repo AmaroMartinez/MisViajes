@@ -89,8 +89,9 @@ La pestaña inferior **Ajustes** (`renderSettings()`) reúne:
 {
   trips: [{
     id, name, startDate, endDate,   // startDate y endDate = fecha+hora (datetime-local)
-    lists: [{ id, name, items: [{ id, name, qtyWanted, qtyDone, status }] }],  // 2 niveles: lista → artículo
-    legs: [{ id, type, name, datetime }]
+    lists: [{ id, name, items: [{ id, name, qtyWanted, qtyDone, status }], collapsed }],  // 2 niveles: lista → artículo
+    legs: [{ id, type, name, datetime }],
+    info: { checkin: { has, at }, fields: [{ id, key, value }], notes }  // pestaña "Datos"
   }],
   templates: [{ id, name, lists }],
   settings: { theme, legLeadMin, packing2d, packing1d }   // se incluye al exportar/importar

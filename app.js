@@ -81,6 +81,11 @@ const store = {
       // Salida y regreso ahora llevan hora: fechas antiguas (solo día) → salida 00:00, regreso 23:59
       if (t.startDate && /^\d{4}-\d{2}-\d{2}$/.test(t.startDate)) t.startDate += 'T00:00';
       if (t.endDate && /^\d{4}-\d{2}-\d{2}$/.test(t.endDate)) t.endDate += 'T23:59';
+      // Datos del viaje (para viajes anteriores a esta versión)
+      if (!t.info) t.info = newInfo();
+      if (!t.info.checkin) t.info.checkin = { has: false, at: '' };
+      if (!Array.isArray(t.info.fields)) t.info.fields = [];
+      if (typeof t.info.notes !== 'string') t.info.notes = '';
     }
     for (const t of this.data.templates) t.lists = flatten(t.lists);
   },
@@ -92,6 +97,10 @@ function newItem(name = '') {
 }
 function newList(name = 'Nueva lista') {
   return { id: uid(), name, items: [] };
+}
+// Datos del viaje: check-in, pares concepto/valor y notas.
+function newInfo() {
+  return { checkin: { has: false, at: '' }, fields: [], notes: '' };
 }
 // Copia profunda de listas (para clonar plantillas) reseteando cantidades introducidas
 function cloneLists(lists, reset = true) {
@@ -321,14 +330,17 @@ function renderTrip() {
   <div class="tabs">
     <button class="tab ${view.tab === 'lists' ? 'is-active' : ''}" data-tab="lists">Listas</button>
     <button class="tab ${view.tab === 'legs' ? 'is-active' : ''}" data-tab="legs">Trayectos</button>
+    <button class="tab ${view.tab === 'info' ? 'is-active' : ''}" data-tab="info">Datos</button>
   </div>`;
 
   let body = '';
   if (view.tab === 'lists') {
     body = `${renderListsBlock(t.lists, { context: 'trip' })}
       <button class="btn wide" data-add-list>+ Añadir lista</button>`;
-  } else {
+  } else if (view.tab === 'legs') {
     body = renderLegs(t);
+  } else {
+    body = renderTripInfo(t);
   }
 
   return `
@@ -436,6 +448,39 @@ function renderLegs(t) {
   </div>`;
 }
 
+/* ---------- Datos del viaje ---------- */
+function renderTripInfo(t) {
+  const info = t.info;
+  const fields = (info.fields || []).map((f) => `
+    <div class="kv-row" data-kv="${f.id}">
+      <input class="input kv-key" data-kv-key="${f.id}" value="${esc(f.key)}" placeholder="Concepto (p. ej. Nº de reserva)">
+      <input class="input kv-val" data-kv-val="${f.id}" value="${esc(f.value)}" placeholder="Valor (p. ej. XXXX1111)">
+      <button class="icon-btn danger tiny" data-del-kv="${f.id}" title="Borrar">✕</button>
+    </div>`).join('');
+
+  return `
+  <section class="set-card">
+    <div class="set-head">Check-in</div>
+    <label class="set-row"><span class="set-label">Tiene check-in</span>
+      <input type="checkbox" data-checkin-has ${info.checkin.has ? 'checked' : ''}></label>
+    ${info.checkin.has ? `<label class="field">
+      <span class="field-label">Abre el</span>
+      <input type="datetime-local" class="input" data-checkin-at value="${info.checkin.at || ''}">
+    </label>` : ''}
+  </section>
+
+  <section class="set-card">
+    <div class="set-head">Datos</div>
+    <div class="kv-list">${fields || '<p class="muted">Sin datos todavía.</p>'}</div>
+    <button class="btn ghost small" data-add-kv>+ Añadir dato</button>
+  </section>
+
+  <section class="set-card">
+    <div class="set-head">Notas</div>
+    <textarea class="input notes" data-trip-notes rows="6" placeholder="Notas generales del viaje…">${esc(info.notes || '')}</textarea>
+  </section>`;
+}
+
 /* ============================================================
    EVENTOS (delegación)
    ============================================================ */
@@ -446,7 +491,7 @@ function bindDynamic() {
 
 // Delegación global para clicks
 app.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-wipe],[data-toggle-list]');
+  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-wipe],[data-toggle-list],[data-add-kv],[data-del-kv]');
   if (!el) return;
   const d = el.dataset;
 
@@ -501,6 +546,8 @@ app.addEventListener('click', (e) => {
     tr.legs.push({ id: uid(), type: 'train', name: '', datetime: '', notified1d: false, notified1h: false });
     return saveRender();
   }
+  if ('addKv' in d) { currentTrip().info.fields.push({ id: uid(), key: '', value: '' }); return saveRender(); }
+  if (d.delKv) { const inf = currentTrip().info; inf.fields = inf.fields.filter((f) => f.id !== d.delKv); return saveRender(); }
   if ('saveAsTpl' in d) return saveTripAsTemplate();
 
   // Steppers de cantidad
@@ -525,6 +572,12 @@ app.addEventListener('input', (e) => {
   if ('itemName' in d) { const [l, i] = d.itemName.split(':'); findItem(l, i).name = el.value; store.save(); return; }
 
   if ('legName' in d) { findLeg(d.legName).name = el.value; store.save(); return; }
+
+  // Datos del viaje
+  if ('checkinAt' in d) { currentTrip().info.checkin.at = el.value; store.save(); return; }
+  if ('tripNotes' in d) { currentTrip().info.notes = el.value; store.save(); return; }
+  if ('kvKey' in d) { const f = currentTrip().info.fields.find((x) => x.id === d.kvKey); if (f) f.key = el.value; store.save(); return; }
+  if ('kvVal' in d) { const f = currentTrip().info.fields.find((x) => x.id === d.kvVal); if (f) f.value = el.value; store.save(); return; }
   if ('legDt' in d) { const lg = findLeg(d.legDt); lg.datetime = el.value; lg.notified1d = lg.notified1h = false; store.save(); scheduleReminderSync(); return updateBoards(); }
 });
 
@@ -533,6 +586,7 @@ app.addEventListener('change', (e) => {
   const el = e.target, d = el.dataset;
   if ('statusItem' in d) { const [l, i] = d.statusItem.split(':'); findItem(l, i).status = el.value; return saveRender(); }
   if ('legType' in d) { findLeg(d.legType).type = el.value; return saveRender(); }
+  if ('checkinHas' in d) { currentTrip().info.checkin.has = el.checked; return saveRender(); }
 
   // Ajustes
   if ('setLeglead' in d) { store.data.settings.legLeadMin = clampInt(el.value) || 60; store.save(); scheduleReminderSync(); return; }
@@ -607,7 +661,7 @@ function createTripFlow() {
       const trip = {
         id: uid(), name: '', startDate: '', endDate: '',
         lists: label === 'Empezar desde cero' ? [] : cloneLists(tpls[i - 1].lists, true),
-        legs: [], notified2d: false, notified1d: false,
+        legs: [], info: newInfo(),
       };
       store.data.trips.push(trip); store.save(); scheduleReminderSync();
       go('trip', { tripId: trip.id, tab: 'lists' });

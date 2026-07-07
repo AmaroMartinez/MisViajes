@@ -281,6 +281,12 @@ input, select, button { font-family: inherit; }
 input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--teal); flex: none; }
 .danger-btn { background: var(--danger); border-color: var(--danger); color: #fff; }
 
+/* Datos del viaje */
+.kv-list { display: grid; gap: 8px; margin-bottom: 10px; }
+.kv-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.kv-key, .kv-val { flex: 1 1 130px; min-width: 0; }
+.notes { width: 100%; resize: vertical; min-height: 90px; font-family: var(--body); }
+
 /* ============================================================
    Modo oscuro
    ============================================================ */
