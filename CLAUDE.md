@@ -1,169 +1,85 @@
 # Mis Viajes — documentación técnica
 
-PWA de gestión de viajes (listas de equipaje, trayectos y avisos). Sin framework ni paso de build: HTML + CSS + JS puros. Datos en `localStorage`.
+App de gestión de viajes (listas de equipaje, plantillas, trayectos y avisos). Un **mismo código web** (HTML/JS/CSS, sin build) que funciona en dos formatos:
 
-Los avisos con la app cerrada se envían **sin servidor propio**: un workflow de **GitHub Actions** se despierta cada 5 minutos y manda las notificaciones push que toquen.
+- **PWA** (iOS / escritorio) — se instala desde el navegador. **Sin notificaciones.**
+- **APK Android** (envuelta con **Capacitor**) — app nativa con **notificaciones locales fiables**.
+
+La APK **carga la web en vivo** (GitHub Pages) mediante `server.url`, así que **los cambios web se aplican a los dos formatos sin recompilar**. Solo hay que recompilar la APK si se toca la parte nativa (plugins).
 
 ## Estructura de archivos
 
 ```
 Mis Viajes/
-├── index.html                  # Shell de la app
-├── app.js                      # Lógica: store, render, eventos, notificaciones, push
-├── styles.css                  # Estilos (tema oscuro, mobile-first)
-├── sw.js                       # Service Worker: caché offline + listener 'push'
-├── manifest.webmanifest
-├── icons/
-├── notifier/                   # Lo ejecuta GitHub Actions (NO es un servidor encendido)
-│   ├── send.js                 # Lee suscripciones, envía los push que tocan
-│   ├── generate-keys.js        # Genera las claves VAPID (una sola vez)
-│   ├── package.json
-│   └── sent.json               # Registro de avisos ya enviados (lo actualiza el workflow)
-├── subscriptions/              # Un .json por dispositivo (los crea la app automáticamente)
-│   └── .gitkeep
+├── index.html, app.js, styles.css   # La app web (misma para PWA y APK)
+├── sw.js                            # Service Worker: solo caché offline de la PWA
+├── manifest.webmanifest             # Manifest de la PWA
+├── icons/                           # Iconos de la PWA
+├── capacitor.config.json            # Config de la APK (appId, appName, server.url)
+├── package.json                     # Capacitor + plugin de notificaciones locales
+├── assets/icon.png                  # Icono fuente (1024px) para generar los de Android
 └── .github/workflows/
-    └── send-notifications.yml  # cron cada 5 min + envío + commit del estado
+    └── build-android.yml            # Compila la APK en la nube y la publica como artefacto
 ```
+
+Carpetas generadas (no se suben, están en `.gitignore`): `node_modules/`, `android/`.
 
 ## Cómo funcionan los avisos
 
-### Con la app abierta (sin nada más)
+**Solo en la APK de Android**, mediante **notificaciones locales nativas** (plugin `@capacitor/local-notifications`). No hay servidor, ni push, ni FCM: el propio móvil programa los avisos y Android los dispara de forma fiable aunque la app esté cerrada.
 
-`checkReminders()` en `app.js` corre al arrancar y cada 60 s (`setInterval`). Comprueba fechas en `localStorage` y muestra notificaciones locales vía la API `Notification`.
+En la **PWA (iOS/escritorio) no hay notificaciones**: la pestaña Avisos muestra un mensaje indicándolo.
 
-### Con la app cerrada (GitHub Actions)
+### Lógica (en `app.js`)
 
-```
-App (app.js)                         GitHub                        Google/Apple (FCM/APNs)
-    │                                  │                                    │
-    │ 1. al activar / cambiar fechas:  │                                    │
-    │    escribe su suscripción +      │                                    │
-    │    calendario en el repo ───────▶│  subscriptions/<deviceId>.json     │
-    │    (API de GitHub, con token)    │                                    │
-    │                                  │ 2. cron cada 5 min:                │
-    │                                  │    notifier/send.js lee los .json  │
-    │                                  │    ¿algún aviso vencido? ─────push─▶│
-    │                                  │                                    │──▶ 🔔 dispositivo
-    │                                  │ 3. marca el aviso como enviado     │
-    │                                  │    (sent.json) y hace commit       │
-```
+- `isNative()` — detecta si corre dentro de la APK (Capacitor).
+- `buildReminders()` — genera el calendario de avisos futuros: 2 días y 1 día antes de cada viaje; 1 día y 1 hora antes de cada trayecto. Cada aviso es `{ id, title, body, sendAt }`.
+- `enableNotifications()` — pide permiso (Android 13+) y guarda `viajes_notif = 'on'`.
+- `syncReminders()` — cancela los avisos pendientes y reprograma todos los futuros con `LocalNotifications.schedule`.
+- `scheduleReminderSync()` — versión con retardo (1,5 s); se llama al cambiar fechas o borrar/crear viajes y trayectos.
+- Al abrir la app y al volver a ella (`visibilitychange`), se llama a `syncReminders()`.
 
-- **`buildPushSchedule()`** (en `app.js`) genera el calendario: avisos 2 días y 1 día antes de cada viaje, y 1 día / 1 hora antes de cada trayecto. Solo incluye avisos futuros.
-- Cada elemento es `{ id, title, body, sendAt }`, con `sendAt` = timestamp Unix (ms).
-- **`send.js`** compara `sendAt` con la hora actual, envía los vencidos y los apunta en `sent.json` como `id@sendAt` para no repetirlos.
-- Si una suscripción caduca (respuesta 410/404), `send.js` borra su fichero automáticamente.
+Los ids de texto (`${legId}_1h`, etc.) se convierten a enteros con `notifNumericId()` porque Android exige id numérico.
 
-### Sincronización del calendario
+## Puesta en marcha / compilar la APK
 
-`syncPushSchedule()` (con retardo de 2,5 s) reescribe el fichero del dispositivo en el repo cuando:
-- Cambia la fecha de salida de un viaje
-- Cambia la fecha/hora de un trayecto
-- Se borra o se crea un viaje o trayecto
+La APK se compila **en la nube** (no hace falta Android Studio local):
 
-## Puesta en marcha (una sola vez)
+1. GitHub → pestaña **Actions → "Compilar APK Android" → Run workflow**.
+2. Al terminar, en la ejecución, sección **Artifacts**, descargar **`MisViajes-apk`** → contiene `MisViajes.apk`.
+3. Instalar en el móvil (permitir "instalar apps de origen desconocido").
 
-### 1. Generar las claves VAPID
+El workflow: instala Node + JDK 17 + Android SDK, ejecuta `npx cap add android`, `npx cap sync`, genera los iconos con `@capacitor/assets` y compila con Gradle (`assembleDebug`).
 
-Son el "DNI" del sistema de avisos. Se generan una vez y se reutilizan siempre.
+> ⚠️ Firma: la APK se firma con la clave "debug", que **cambia entre compilaciones**. Por eso, al instalar una versión nueva puede pedir **desinstalar la anterior** (y se perderían los viajes guardados en esa APK). Para actualizaciones sin desinstalar, habría que firmar con una **clave fija** guardada como secreto en GitHub (pendiente).
 
-```bash
-cd notifier
-npm install
-npm run keys
-```
+## Cambios y despliegue
 
-Te imprime `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`. Guárdalas.
+- **Cambios web** (listas, viajes, UI, textos): edita los archivos, sube a `main`. GitHub Pages redespliega la web y **tanto la PWA como la APK** los cogen (la APK carga la web en vivo). No hace falta recompilar la APK.
+- **Cambios nativos** (plugins, permisos, icono, nombre): hay que **recompilar la APK** (Run workflow) y reinstalarla.
+- Si cambias `sw.js`, sube el número de caché (`viajes-vN`) para que la PWA se actualice.
 
-### 2. Configurar `app.js`
+## Compatibilidad de notificaciones
 
-En la parte superior de `app.js`, rellena:
-
-```js
-const GITHUB_OWNER = 'tu-usuario';     // usuario u organización de GitHub
-const GITHUB_REPO = 'mis-viajes';      // nombre del repositorio
-const VAPID_PUBLIC_KEY = 'BNc4...';    // la clave PÚBLICA del paso 1
-```
-
-La clave **privada NO** va aquí (sería visible desde el móvil).
-
-### 3. Subir el proyecto a GitHub
-
-Crea un repositorio (**recomendado: privado**) y sube todos los archivos. GitHub Pages puede servir la app (`index.html`), y GitHub Actions ejecutará el workflow.
-
-### 4. Guardar las claves como Secrets del repositorio
-
-En GitHub: repositorio → **Settings → Secrets and variables → Actions → New repository secret**. Crea tres:
-
-| Secret | Valor |
-|---|---|
-| `VAPID_PUBLIC_KEY` | la clave pública |
-| `VAPID_PRIVATE_KEY` | la clave privada |
-| `VAPID_EMAIL` | tu email (formato de contacto que exige el estándar) |
-
-### 5. Crear un token de acceso (para que la app escriba en el repo)
-
-La app necesita permiso para guardar su suscripción en el repo. En GitHub:
-
-**Settings (de tu cuenta) → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
-- Repository access: **Only select repositories** → elige el repo de la app
-- Permissions → Repository permissions → **Contents: Read and write**
-- Genera y copia el token (empieza por `github_pat_...`)
-
-### 6. Activar los avisos en cada dispositivo
-
-En la app instalada (PWA), abre **Avisos** (barra inferior) y:
-1. **Activar avisos** → concede el permiso del navegador.
-2. **Conectar con GitHub (una vez)** → pega el token del paso 5.
-
-A partir de ahí el dispositivo queda registrado. Repite este paso 6 en cada móvil (el tuyo y el de tus familiares). El token puede ser el mismo para todos o uno por persona.
-
-## Seguridad del token
-
-- El token se guarda **solo en el dispositivo** (`localStorage`), nunca en el código ni en el repo.
-- Usa un token **fine-grained** limitado a **un solo repositorio** y a **Contents: write**. Así, en el peor caso, solo permitiría tocar ese repo.
-- Se recomienda que el repositorio sea **privado**.
-- Botón "Olvidar token de GitHub" en Avisos para borrarlo del dispositivo.
-
-## Compatibilidad
-
-| Plataforma | App abierta | App cerrada |
+| Plataforma | App | Notificaciones |
 |---|---|---|
-| Android (Chrome, PWA instalada) | ✅ | ✅ |
-| iOS 16.4+ (Safari, PWA instalada) | ✅ | ✅ |
-| iOS < 16.4 | ✅ | ❌ |
-| Desktop (Chrome/Edge) | ✅ | ✅ |
+| Android | APK (Capacitor) | ✅ locales, fiables en segundo plano |
+| iOS | PWA instalada | ❌ (decisión de diseño) |
+| Escritorio | PWA | ❌ |
 
-**Requisito iOS**: la PWA debe estar añadida a la pantalla de inicio.
-
-**Precisión**: el cron de GitHub Actions se ejecuta cada 5 min y puede retrasarse unos minutos si GitHub está ocupado. Para avisos tipo "faltan 2 días" o "tren en 1 hora" es más que suficiente. No esperes precisión al minuto exacto.
-
-## Modelo de datos
-
-### En el dispositivo (`localStorage`)
+## Modelo de datos (`localStorage`)
 
 ```js
 // clave 'viajes_app_v1'
 {
   trips: [{
     id, name, startDate, endDate,
-    notified2d, notified1d,   // flags del motor local (checkReminders)
     lists: [{ id, name, items: [{ id, name, qtyWanted, qtyDone, status }] }],  // 2 niveles: lista → artículo
-    legs: [{ id, type, name, datetime, notified1d, notified1h }]
+    legs: [{ id, type, name, datetime }]
   }],
   templates: [{ id, name, lists }]
 }
-// clave 'viajes_device_id' → id único del dispositivo
-// clave 'viajes_gh_token'  → token de GitHub (solo en este dispositivo)
+// clave 'viajes_notif' → 'on' | 'off' (avisos activados en la APK)
 ```
 
-### En el repo (`subscriptions/<deviceId>.json`)
-
-```js
-{
-  subscription: { endpoint, keys: { p256dh, auth } },  // suscripción push del navegador
-  schedule: [{ id, title, body, sendAt }],             // avisos futuros
-  updatedAt: 1234567890
-}
-```
-
-Los flags `notifiedXx` son solo para el motor local. El estado de "ya enviado" del segundo plano lo lleva `notifier/sent.json` en el repo.
+Los datos son **locales por dispositivo** (no se sincronizan entre móviles).

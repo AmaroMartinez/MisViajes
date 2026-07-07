@@ -1,5 +1,6 @@
-/* Service worker: cachea la app para uso offline y gestiona clics en avisos. */
-const CACHE = 'viajes-v4';
+/* Service worker: solo cachea la app para uso offline (PWA).
+   Las notificaciones ya no van por aquí: son locales nativas en la app de Android. */
+const CACHE = 'viajes-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -37,26 +38,3 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
-// Recibe push del servidor y muestra la notificación (funciona con la app cerrada).
-self.addEventListener('push', (e) => {
-  const data = e.data?.json() || {};
-  e.waitUntil(
-    self.registration.showNotification(data.title || 'Viajes', {
-      body: data.body || '',
-      icon: './icons/icon-192.png',
-      badge: './icons/icon-192.png',
-      tag: data.tag || 'viajes-push',
-    })
-  );
-});
-
-// Al tocar una notificación, enfoca o abre la app.
-self.addEventListener('notificationclick', (e) => {
-  e.notification.close();
-  e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const c of list) { if ('focus' in c) return c.focus(); }
-      if (self.clients.openWindow) return self.clients.openWindow('./');
-    })
-  );
-});
