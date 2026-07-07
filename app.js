@@ -56,7 +56,6 @@ const store = {
       this.data.settings || {}
     );
     this.migrate();
-    if (this.data.templates.length === 0) this.seedTemplates();
   },
   save() {
     localStorage.setItem(KEY, JSON.stringify(this.data));
@@ -84,32 +83,6 @@ const store = {
       if (t.endDate && /^\d{4}-\d{2}-\d{2}$/.test(t.endDate)) t.endDate += 'T23:59';
     }
     for (const t of this.data.templates) t.lists = flatten(t.lists);
-  },
-  seedTemplates() {
-    // Plantilla de ejemplo para arrancar (editable/borrable)
-    this.data.templates.push({
-      id: uid(),
-      name: 'Viaje largo (avión)',
-      lists: [
-        { id: uid(), name: 'Ropa Maleta', items: [
-          { id: uid(), name: 'Camisetas', qtyWanted: 6, qtyDone: 0, status: 'to_wash' },
-          { id: uid(), name: 'Pantalones', qtyWanted: 3, qtyDone: 0, status: 'pending' },
-          { id: uid(), name: 'Ropa interior', qtyWanted: 8, qtyDone: 0, status: 'to_wash' },
-          { id: uid(), name: 'Calzado', qtyWanted: 2, qtyDone: 0, status: 'pending' },
-        ]},
-        { id: uid(), name: 'Neceser Maleta', items: [
-          { id: uid(), name: 'Cepillo de dientes', qtyWanted: 1, qtyDone: 0, status: 'pending' },
-          { id: uid(), name: 'Pasta de dientes', qtyWanted: 1, qtyDone: 0, status: 'to_buy' },
-        ]},
-        { id: uid(), name: 'Mochila (mano)', items: [
-          { id: uid(), name: 'Móvil', qtyWanted: 1, qtyDone: 0, status: 'to_charge' },
-          { id: uid(), name: 'Powerbank', qtyWanted: 1, qtyDone: 0, status: 'to_charge' },
-          { id: uid(), name: 'Pasaporte', qtyWanted: 1, qtyDone: 0, status: 'pending' },
-          { id: uid(), name: 'Adaptador de enchufe', qtyWanted: 1, qtyDone: 0, status: 'to_buy' },
-        ]},
-      ],
-    });
-    this.save();
   },
 };
 
@@ -899,7 +872,7 @@ function deleteAllData() {
     closeSheet();
     localStorage.removeItem('viajes_app_v1');
     store.data = { trips: [], templates: [] };
-    store.load();          // reaplica ajustes por defecto y la plantilla de ejemplo
+    store.load();          // reaplica ajustes por defecto (queda todo vacío)
     applyTheme();
     syncReminders();       // cancela los avisos programados (ya no hay viajes)
     go('home');
