@@ -472,7 +472,7 @@ function bindDynamic() {
 
 // Delegación global para clicks
 app.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export]');
+  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export],[data-wipe]');
   if (!el) return;
   const d = el.dataset;
 
@@ -487,6 +487,7 @@ app.addEventListener('click', (e) => {
   if ('notifToggle' in d) return toggleNotifications();
   if ('notifTest' in d) return notifTest();
   if ('export' in d) return exportData();
+  if ('wipe' in d) return deleteAllData();
 
   if (d.delTrip) return confirmDelete('¿Borrar este viaje y todas sus listas?', () => {
     store.data.trips = store.data.trips.filter((x) => x.id !== d.delTrip);
@@ -892,6 +893,20 @@ function importData(input) {
   reader.readAsText(file);
 }
 
+// Borra TODO (viajes, plantillas y ajustes) tras confirmar. Vuelve al estado inicial.
+function deleteAllData() {
+  confirmDelete('¿Borrar TODOS los datos? Se eliminarán todos los viajes, plantillas y ajustes. No se puede deshacer.', () => {
+    closeSheet();
+    localStorage.removeItem('viajes_app_v1');
+    store.data = { trips: [], templates: [] };
+    store.load();          // reaplica ajustes por defecto y la plantilla de ejemplo
+    applyTheme();
+    syncReminders();       // cancela los avisos programados (ya no hay viajes)
+    go('home');
+    toast('Todos los datos borrados');
+  });
+}
+
 /* ---------- Pantalla de Ajustes ---------- */
 function renderSettings() {
   const s = store.data.settings;
@@ -958,6 +973,11 @@ function renderSettings() {
       <label class="btn wide import-btn">Importar datos
         <input type="file" accept="application/json,.json" data-import hidden>
       </label>
+    </section>
+
+    <section class="set-card">
+      <div class="set-head">Zona de peligro</div>
+      <button class="btn wide danger-btn" data-wipe>Borrar todos los datos</button>
     </section>
   </main>
   ${bottomNav('settings')}`;

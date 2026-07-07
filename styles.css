@@ -277,6 +277,7 @@ input, select, button { font-family: inherit; }
 .seg-btn { border: none; background: transparent; padding: 7px 16px; font-weight: 600; cursor: pointer; color: var(--muted); }
 .seg-btn.is-active { background: var(--teal); color: #fff; }
 input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--teal); flex: none; }
+.danger-btn { background: var(--danger); border-color: var(--danger); color: #fff; }
 
 /* ============================================================
    Modo oscuro
