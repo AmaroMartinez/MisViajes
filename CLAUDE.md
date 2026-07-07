@@ -33,7 +33,7 @@ En la **PWA (iOS/escritorio) no hay notificaciones**: la pestaña Avisos muestra
 ### Lógica (en `app.js`)
 
 - `isNative()` — detecta si corre dentro de la APK (Capacitor).
-- `buildReminders()` — genera el calendario de avisos futuros según los **ajustes**: avisos de equipaje **48 h y/o 24 h** antes de la **fecha y hora de salida** del viaje (activables por separado), y un aviso de trayecto a la antelación elegida (30 min – 3 h, por defecto 1 h). Cada aviso es `{ id, title, body, sendAt }`. Solo se programan avisos **futuros** (`sendAt > now`): si el momento ya pasó, no se envía.
+- `buildReminders()` — genera el calendario de avisos futuros según los **ajustes**: avisos de equipaje **48 h y/o 24 h** antes de la **fecha y hora de salida** del viaje (activables por separado), un aviso de trayecto a la antelación elegida (30 min – 3 h, por defecto 1 h), y un aviso **5 min antes de que abra el check-in** (si el viaje lo tiene configurado). Cada aviso es `{ id, title, body, sendAt }`. Solo se programan avisos **futuros** (`sendAt > now`): si el momento ya pasó, no se envía.
 - `enableNotifications()` — pide permiso (Android 13+) y guarda `viajes_notif = 'on'`.
 - `syncReminders()` — cancela los avisos pendientes y reprograma todos los futuros con `LocalNotifications.schedule`.
 - `scheduleReminderSync()` — versión con retardo (1,5 s); se llama al cambiar fechas o borrar/crear viajes y trayectos.
@@ -80,7 +80,14 @@ La pestaña inferior **Ajustes** (`renderSettings()`) reúne:
 - **Avisos de trayecto** (solo Android): antelación 30 min – 3 h.
 - **Avisos de equipaje** (solo Android): activar 2 días / 1 día antes por separado.
 - **Apariencia**: tema **automático** (por defecto, sigue el `prefers-color-scheme` del sistema y cambia en vivo), **claro** u **oscuro**. `applyTheme()` resuelve "auto" a light/dark y pone `body[data-theme]`.
-- **Copia de seguridad**: `exportData()` **descarga** un `.json` con todo (viajes, plantillas y ajustes) — en web descarga directa; en la APK lo guarda en la carpeta **Documentos** con `@capacitor/filesystem`; `importData()` restaura desde un `.json` elegido con el selector de archivos.
+- **Copia de seguridad**: `exportData()` **descarga** un `.json` con todo (viajes, plantillas y ajustes; nombre con fecha-hora-segundos) — en web descarga directa; en la APK lo guarda en la carpeta **Documentos** con `@capacitor/filesystem`; `importData()` restaura desde un `.json` elegido con el selector de archivos.
+- **Borrar todos los datos** (`deleteAllData()`): con confirmación, vacía viajes/plantillas/ajustes, cancela los avisos y vuelve al estado inicial (tema "auto").
+
+## Viajes (Home y acciones)
+
+- **Home** separa automáticamente por fecha: próximos arriba y sección **"Pasados (N)"** plegable y atenuada (`isTripPast()`, estado `showPast`).
+- El botón **⧉** del viaje abre un menú: **Duplicar viaje** (`duplicateTrip()`, copia estructura y datos, resetea progreso y vacía fechas) o **Guardar como plantilla**.
+- Al **abrir** un viaje/plantilla, las listas empiezan **plegadas** (`collapseAllLists()`).
 
 ## Modelo de datos (`localStorage`)
 

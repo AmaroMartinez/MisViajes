@@ -1,55 +1,49 @@
-# Viajes — app de preparación y equipaje (PWA)
+# Mis Viajes
 
-App web instalable para preparar viajes: listas con **items y subitems**, **estados** (pendiente de lavar, cargar, comprar, secar, listo), **cantidad objetivo / en maleta**, **plantillas** reutilizables, **trayectos** (tren, bus, vuelo…) y **avisos** antes del viaje y de cada trayecto. Todo se guarda en el dispositivo (localStorage), funciona **offline** y no necesita servidor ni tiendas de apps.
+App para **preparar viajes**: listas de equipaje, plantillas reutilizables, trayectos, datos del viaje y avisos. Los datos se guardan **en el dispositivo** (nada de cuentas ni servidores) y funciona **offline**.
 
-## Publicar en GitHub Pages
+Un mismo código funciona en dos formatos:
 
-1. Crea un repositorio en GitHub (por ejemplo `viajes`).
-2. Sube **todos** estos archivos a la raíz del repo (no dentro de una subcarpeta):
-   ```
-   index.html
-   app.js
-   styles.css
-   manifest.webmanifest
-   sw.js
-   .nojekyll
-   icons/icon-192.png
-   icons/icon-512.png
-   icons/icon-maskable-512.png
-   ```
-3. En el repo: **Settings → Pages → Build and deployment → Source: "Deploy from a branch"**, rama `main`, carpeta `/ (root)`. Guarda.
-4. Espera 1–2 min. Tu app estará en `https://TU_USUARIO.github.io/viajes/`.
+- **Android** — app nativa (APK) con **notificaciones fiables** (avisos aunque la app esté cerrada).
+- **iOS / escritorio** — se instala como **PWA** desde el navegador. **Sin notificaciones** (limitación de la web en iOS).
 
-> Las rutas son relativas, así que funciona igual en la raíz del dominio o en una subcarpeta del repo.
+Web en vivo: **https://amaromartinez.github.io/MisViajes/**
 
-## Instalar en el móvil (sin App Store / Play Store)
+## Qué puedes hacer
 
-- **Android (Chrome):** abre la URL → menú ⋮ → **"Añadir a pantalla de inicio"** / **"Instalar app"**.
-- **iPhone (Safari):** abre la URL → botón compartir → **"Añadir a pantalla de inicio"**.
+- **Viajes** con fecha y hora de **salida** y **regreso**, y cuenta atrás. Los viajes pasados se agrupan aparte automáticamente.
+- **Listas de equipaje** (lista → artículos) con **cantidad objetivo / en maleta** y **estado** (pendiente, lavar, secar, cargar, comprar, listo). Las listas se pliegan/despliegan.
+- **Plantillas** reutilizables y **duplicar** un viaje entero.
+- **Trayectos** (vuelo, tren, bus, coche, barco…) con fecha y hora.
+- **Datos del viaje**: check-in (con hora de apertura), pares concepto/valor (nº de reserva, hotel…) y notas.
+- **Avisos** (solo Android): 48 h y/o 24 h antes del viaje, X antes de cada trayecto (30 min–3 h), y 5 min antes de que abra el check-in.
+- **Ajustes**: tema claro/oscuro/automático, opciones de avisos, **exportar/importar** copia de seguridad y borrar todos los datos.
 
-Se abrirá a pantalla completa como una app normal.
+## Instalar en Android (APK)
 
-## Avisos (importante)
+La app se distribuye como archivo `.apk` (no está en Play Store).
 
-- Activa los avisos desde la pestaña **Avisos** (pide permiso al navegador).
-- La app comprueba los recordatorios **al abrirla** y **mientras está abierta** (cada minuto). Dispara el aviso de "2 días antes" / "1 día antes" del viaje si hay pendientes, y "1 día" / "1 hora antes" de cada trayecto.
-- **Limitación real de la web:** las páginas web **no pueden** programar de forma fiable una notificación para que salte con la app totalmente cerrada (sobre todo en iPhone). Por eso el aviso salta cuando abres o tienes abierta la app dentro de la ventana de tiempo. Funciona mejor en Android con la app instalada.
-- Si necesitaras avisos con la app cerrada al 100%, haría falta un pequeño servidor de *push* (Web Push con VAPID). Se puede añadir después; dímelo si lo quieres.
+1. **Conseguir la APK:** en GitHub → pestaña **Actions → "Compilar APK Android" → Run workflow**. Al terminar, abre la ejecución y en **Artifacts** descarga **`MisViajes-apk`** (un zip con `MisViajes.apk` dentro). *(O pídele el `.apk` a quien ya lo tenga.)*
+2. **Instalar:** pasa el `.apk` al móvil y ábrelo. Android pedirá permitir **"instalar apps de origen desconocido"** → acéptalo.
+3. **Activar avisos:** abre la app → pestaña **Ajustes → Activar avisos** y concede el permiso.
 
-## Uso rápido
+> Al actualizar a una APK nueva puede pedir **desinstalar la anterior** (se firma en modo debug). Si tienes datos que no quieras perder, **exporta** antes desde Ajustes.
 
-- **+ Nuevo viaje** → empezar desde cero o desde una plantilla.
-- Dentro del viaje: pestaña **Listas** (añade listas, artículos, subartículos; ajusta estado y cantidades con los botones − / +) y pestaña **Trayectos**.
-- El contador **"En maleta / objetivo"** calcula lo que falta. Al completar la cantidad, el estado pasa a **Listo** automáticamente.
-- **Guardar como plantilla** reutiliza las listas del viaje (sin las cantidades ya metidas).
-- Borra viajes, listas, artículos y plantillas con la **✕** / papelera.
+## Instalar en iOS / iPhone (PWA)
 
-## Estructura del código
+1. Abre **https://amaromartinez.github.io/MisViajes/** en **Safari**.
+2. Botón **Compartir** → **"Añadir a pantalla de inicio"**.
+3. Se abrirá a pantalla completa como una app.
 
-- `index.html` — shell de la PWA y carga de fuentes/estilos.
-- `app.js` — estado, almacenamiento, render de vistas, eventos y motor de avisos.
-- `styles.css` — identidad visual (panel de salidas / billete de transporte).
-- `sw.js` — service worker: caché offline y clic en notificaciones.
-- `manifest.webmanifest` — metadatos de instalación.
+> En iOS **no hay notificaciones** (es una limitación de las apps web). El resto de funciones van igual.
 
-Sin dependencias ni paso de compilación: es HTML/CSS/JS puro.
+## Copia de seguridad
+
+Tus datos son **locales de cada dispositivo** y no se sincronizan. Para no perderlos:
+
+- **Ajustes → Exportar datos**: descarga un `.json` con todos los viajes, plantillas y ajustes.
+- **Ajustes → Importar datos**: restaura desde un `.json` exportado.
+
+## Para desarrolladores
+
+Es HTML/CSS/JS puro (sin build) servido por GitHub Pages; la APK se genera con **Capacitor** y carga la web en vivo. Detalles técnicos, arquitectura y flujo de despliegue en [`CLAUDE.md`](CLAUDE.md).
