@@ -33,7 +33,7 @@ En la **PWA (iOS/escritorio) no hay notificaciones**: la pestaña Avisos muestra
 ### Lógica (en `app.js`)
 
 - `isNative()` — detecta si corre dentro de la APK (Capacitor).
-- `buildReminders()` — genera el calendario de avisos futuros: 2 días y 1 día antes de cada viaje; 1 día y 1 hora antes de cada trayecto. Cada aviso es `{ id, title, body, sendAt }`.
+- `buildReminders()` — genera el calendario de avisos futuros según los **ajustes**: avisos de equipaje 2 días y/o 1 día antes de cada viaje (activables por separado), y un aviso de trayecto a la antelación elegida (30 min – 3 h, por defecto 1 h). Cada aviso es `{ id, title, body, sendAt }`.
 - `enableNotifications()` — pide permiso (Android 13+) y guarda `viajes_notif = 'on'`.
 - `syncReminders()` — cancela los avisos pendientes y reprograma todos los futuros con `LocalNotifications.schedule`.
 - `scheduleReminderSync()` — versión con retardo (1,5 s); se llama al cambiar fechas o borrar/crear viajes y trayectos.
@@ -67,6 +67,15 @@ El workflow: instala Node + JDK 17 + Android SDK, ejecuta `npx cap add android`,
 | iOS | PWA instalada | ❌ (decisión de diseño) |
 | Escritorio | PWA | ❌ |
 
+## Pantalla de Ajustes
+
+La pestaña inferior **Ajustes** (`renderSettings()`) reúne:
+- **Notificaciones** (solo Android): activar/desactivar y aviso de prueba.
+- **Avisos de trayecto** (solo Android): antelación 30 min – 3 h.
+- **Avisos de equipaje** (solo Android): activar 2 días / 1 día antes por separado.
+- **Apariencia**: tema **claro** (por defecto) u **oscuro** (`body[data-theme="dark"]` en CSS; `applyTheme()` lo aplica al arrancar).
+- **Copia de seguridad**: `exportData()` descarga un `.json` con todo (viajes, plantillas y ajustes) y lo copia al portapapeles; `importData()` restaura desde un `.json`.
+
 ## Modelo de datos (`localStorage`)
 
 ```js
@@ -77,7 +86,8 @@ El workflow: instala Node + JDK 17 + Android SDK, ejecuta `npx cap add android`,
     lists: [{ id, name, items: [{ id, name, qtyWanted, qtyDone, status }] }],  // 2 niveles: lista → artículo
     legs: [{ id, type, name, datetime }]
   }],
-  templates: [{ id, name, lists }]
+  templates: [{ id, name, lists }],
+  settings: { theme, legLeadMin, packing2d, packing1d }   // se incluye al exportar/importar
 }
 // clave 'viajes_notif' → 'on' | 'off' (avisos activados en la APK)
 ```

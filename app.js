@@ -50,6 +50,11 @@ const store = {
     } catch (e) { /* datos corruptos: empezamos limpios */ }
     if (!this.data.trips) this.data.trips = [];
     if (!this.data.templates) this.data.templates = [];
+    // Ajustes con valores por defecto (se conservan al exportar/importar)
+    this.data.settings = Object.assign(
+      { theme: 'light', legLeadMin: 60, packing2d: true, packing1d: true },
+      this.data.settings || {}
+    );
     this.migrate();
     if (this.data.templates.length === 0) this.seedTemplates();
   },
@@ -197,6 +202,7 @@ function render() {
   else if (view.name === 'templates') html = renderTemplates();
   else if (view.name === 'template') html = renderTemplateEditor();
   else if (view.name === 'trip') html = renderTrip();
+  else if (view.name === 'settings') html = renderSettings();
   app.innerHTML = html;
   bindDynamic();
 }
@@ -210,7 +216,7 @@ function bottomNav(active) {
   return `<nav class="bottomnav">
     ${item('home', 'Viajes', '⌂')}
     ${item('templates', 'Plantillas', '❑')}
-    ${item('notify', 'Avisos', '◔')}
+    ${item('settings', 'Ajustes', '⚙')}
   </nav>`;
 }
 
@@ -274,9 +280,8 @@ function renderTemplates() {
 
   return `
   <header class="topbar">
-    <button class="btn ghost" data-nav="home">‹ Viajes</button>
-    <div class="topbar-title">Plantillas</div>
-    <button class="btn btn-primary" data-new-tpl>+ Nueva</button>
+    <div class="brand"><span class="brand-mark">◑</span> Mis Viajes</div>
+    <button class="btn btn-primary" data-new-tpl>+ Nueva plantilla</button>
   </header>
   <main class="wrap">
     <p class="muted intro">Guarda listas base y reutilízalas al crear un viaje. Empieza desde cero o desde una plantilla.</p>
@@ -447,17 +452,13 @@ function renderLegs(t) {
    EVENTOS (delegación)
    ============================================================ */
 function bindDynamic() {
-  // Navegación inferior
-  $$('[data-nav]').forEach((b) => b.onclick = () => {
-    const n = b.dataset.nav;
-    if (n === 'notify') return openNotifySheet();
-    go(n);
-  });
+  // Navegación inferior / botones de volver
+  $$('[data-nav]').forEach((b) => b.onclick = () => go(b.dataset.nav));
 }
 
 // Delegación global para clicks
 app.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item]');
+  const el = e.target.closest('[data-open-trip],[data-open-tpl],[data-new-trip],[data-new-tpl],[data-tab],[data-del-trip],[data-del-tpl],[data-del-list],[data-del-item],[data-del-leg],[data-add-list],[data-add-list-tpl],[data-add-item],[data-add-leg],[data-save-as-tpl],[data-qtydone-inc-item],[data-qtydone-dec-item],[data-qtywant-inc-item],[data-qtywant-dec-item],[data-set-theme],[data-notif-toggle],[data-notif-test],[data-export]');
   if (!el) return;
   const d = el.dataset;
 
@@ -466,6 +467,12 @@ app.addEventListener('click', (e) => {
   if ('newTrip' in d) return createTripFlow();
   if ('newTpl' in d) return createTemplate();
   if ('tab' in d) { view.tab = d.tab; return render(); }
+
+  // Ajustes
+  if ('setTheme' in d) { store.data.settings.theme = d.setTheme; store.save(); applyTheme(); return render(); }
+  if ('notifToggle' in d) return toggleNotifications();
+  if ('notifTest' in d) return notifTest();
+  if ('export' in d) return exportData();
 
   if (d.delTrip) return confirmDelete('¿Borrar este viaje y todas sus listas?', () => {
     store.data.trips = store.data.trips.filter((x) => x.id !== d.delTrip);
@@ -521,6 +528,12 @@ app.addEventListener('change', (e) => {
   const el = e.target, d = el.dataset;
   if ('statusItem' in d) { const [l, i] = d.statusItem.split(':'); findItem(l, i).status = el.value; return saveRender(); }
   if ('legType' in d) { findLeg(d.legType).type = el.value; return saveRender(); }
+
+  // Ajustes
+  if ('setLeglead' in d) { store.data.settings.legLeadMin = clampInt(el.value) || 60; store.save(); scheduleReminderSync(); return; }
+  if ('togglePacking2d' in d) { store.data.settings.packing2d = el.checked; store.save(); scheduleReminderSync(); return; }
+  if ('togglePacking1d' in d) { store.data.settings.packing1d = el.checked; store.save(); scheduleReminderSync(); return; }
+  if ('import' in d) return importData(el);
 });
 
 /* ---------- Helpers de mutación ---------- */
@@ -638,8 +651,12 @@ function toast(msg) {
    NOTIFICACIONES LOCALES (solo en la app nativa de Android)
    ============================================================ */
 
-// Genera el calendario completo de avisos futuros a partir de los datos actuales.
+// Texto legible de una antelación en minutos: 60 → "1 h", 90 → "90 min".
+function leadText(min) { return min % 60 === 0 ? `${min / 60} h` : `${min} min`; }
+
+// Genera el calendario completo de avisos futuros a partir de los datos y ajustes.
 function buildReminders() {
+  const s = store.data.settings;
   const now = Date.now();
   const items = [];
   for (const t of store.data.trips) {
@@ -648,13 +665,13 @@ function buildReminders() {
       if (start > now) {
         const pend = tripPendingCount(t);
         const name = t.name || 'tu viaje';
-        items.push({
+        if (s.packing2d) items.push({
           id: `${t.id}_2d`,
           title: `Faltan 2 días: ${name}`,
           body: pend > 0 ? `Tienes ${pend} artículos pendientes.` : 'Revisa tu equipaje.',
           sendAt: start - 2 * DAY,
         });
-        items.push({
+        if (s.packing1d) items.push({
           id: `${t.id}_1d`,
           title: `Mañana sales: ${name}`,
           body: pend > 0 ? `Todavía quedan ${pend} artículos pendientes.` : '¡Todo listo!',
@@ -668,17 +685,12 @@ function buildReminders() {
       if (dt > now) {
         const ty = legType(leg.type).label;
         const legName = leg.name || t.name || 'trayecto';
+        const lead = Math.min(180, Math.max(30, s.legLeadMin || 60));
         items.push({
-          id: `${leg.id}_1d`,
-          title: `${ty} mañana: ${legName}`,
+          id: `${leg.id}_lead`,
+          title: `${ty} en ${leadText(lead)}: ${legName}`,
           body: `Salida: ${fmtDateTime(leg.datetime)}`,
-          sendAt: dt - DAY,
-        });
-        items.push({
-          id: `${leg.id}_1h`,
-          title: `${ty} en 1 hora: ${legName}`,
-          body: `Salida: ${fmtDateTime(leg.datetime)}`,
-          sendAt: dt - HOUR,
+          sendAt: dt - lead * 60000,
         });
       }
     }
@@ -760,55 +772,138 @@ async function disableNotifications() {
 /* ============================================================
    AVISOS (hoja de ajustes)
    ============================================================ */
-// Hoja de ajustes de avisos
-async function openNotifySheet() {
-  // En la PWA (iOS/escritorio) no hay notificaciones: solo en la app de Android.
-  if (!isNative()) {
-    openSheet('Avisos', 'Las notificaciones solo están disponibles en la app de Android (Mis Viajes).', [
-      { label: 'Entendido', kind: 'primary', action: closeSheet },
-    ]);
-    return;
-  }
+/* ---------- Tema (claro/oscuro) ---------- */
+function applyTheme() {
+  document.body.dataset.theme = (store.data.settings && store.data.settings.theme) || 'light';
+}
 
+/* ---------- Acciones de ajustes ---------- */
+async function toggleNotifications() {
+  if (notifEnabled()) { await disableNotifications(); toast('Avisos desactivados'); }
+  else { const ok = await enableNotifications(); toast(ok ? 'Avisos activados' : 'Permiso denegado'); }
+  render();
+}
+async function notifTest() {
+  const LN = localNotifications();
+  if (!LN) return;
+  try {
+    await LN.schedule({ notifications: [{
+      id: 999999, title: 'Aviso de prueba',
+      body: 'Las notificaciones funcionan en este dispositivo.',
+      schedule: { at: new Date(Date.now() + 5000), allowWhileIdle: true },
+    }] });
+    toast('Te llegará en ~5 segundos');
+  } catch (e) { toast('No se pudo programar el aviso'); }
+}
+// Exporta todos los datos (viajes, plantillas y ajustes) a un .json y al portapapeles.
+function exportData() {
+  const json = JSON.stringify(store.data, null, 2);
+  const filename = `mis-viajes-${new Date().toISOString().slice(0, 10)}.json`;
+  try {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) { /* algunos WebView no descargan; queda el portapapeles */ }
+  if (navigator.clipboard) navigator.clipboard.writeText(json).catch(() => {});
+  toast('Datos exportados (descarga y portapapeles)');
+}
+// Importa un .json previamente exportado, reemplazando todos los datos.
+function importData(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data || !Array.isArray(data.trips) || !Array.isArray(data.templates)) throw new Error('formato');
+      store.data = data;
+      store.data.settings = Object.assign(
+        { theme: 'light', legLeadMin: 60, packing2d: true, packing1d: true },
+        store.data.settings || {}
+      );
+      store.migrate();
+      store.save();
+      applyTheme();
+      scheduleReminderSync();
+      go('home');
+      toast('Datos importados');
+    } catch (e) { toast('Archivo no válido'); }
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- Pantalla de Ajustes ---------- */
+function renderSettings() {
+  const s = store.data.settings;
+  const native = isNative();
   const on = notifEnabled();
-  const actions = [];
+  const leads = [30, 45, 60, 90, 120, 150, 180];
 
-  if (!on) {
-    actions.push({
-      label: 'Activar avisos', kind: 'primary', action: async () => {
-        const ok = await enableNotifications();
-        closeSheet();
-        toast(ok ? 'Avisos activados' : 'No se han podido activar (permiso denegado)');
-      },
-    });
-  } else {
-    actions.push({
-      label: 'Aviso de prueba', kind: 'primary', action: async () => {
-        closeSheet();
-        const LN = localNotifications();
-        try {
-          await LN.schedule({ notifications: [{
-            id: 999999,
-            title: 'Aviso de prueba',
-            body: 'Las notificaciones funcionan en este dispositivo.',
-            schedule: { at: new Date(Date.now() + 5000), allowWhileIdle: true },
-          }] });
-          toast('Te llegará en ~5 segundos');
-        } catch (e) { toast('No se pudo programar el aviso'); }
-      },
-    });
-    actions.push({
-      label: 'Desactivar avisos', kind: 'default', action: async () => {
-        await disableNotifications();
-        closeSheet();
-        toast('Avisos desactivados');
-      },
-    });
-  }
+  const notifSection = native
+    ? `<div class="set-row">
+         <div><div class="set-label">Avisos</div><div class="muted">${on ? 'Activados' : 'Desactivados'}</div></div>
+         <button class="btn ${on ? '' : 'btn-primary'}" data-notif-toggle>${on ? 'Desactivar' : 'Activar'}</button>
+       </div>
+       ${on ? `<button class="btn ghost small wide" data-notif-test>Enviar aviso de prueba</button>` : ''}`
+    : `<p class="muted">Las notificaciones solo están disponibles en la app de Android.</p>`;
 
-  actions.push({ label: 'Cerrar', kind: 'ghost', action: closeSheet });
+  const notifExtra = native && on ? `
+    <section class="set-card">
+      <div class="set-head">Avisos de trayecto</div>
+      <label class="set-row">
+        <span class="set-label">Avisar antes de la salida</span>
+        <select class="input set-select" data-set-leglead>
+          ${leads.map((m) => `<option value="${m}" ${s.legLeadMin === m ? 'selected' : ''}>${leadText(m)}</option>`).join('')}
+        </select>
+      </label>
+    </section>
+    <section class="set-card">
+      <div class="set-head">Avisos de equipaje pendiente</div>
+      <label class="set-row"><span class="set-label">2 días antes del viaje</span>
+        <input type="checkbox" data-toggle-packing2d ${s.packing2d ? 'checked' : ''}></label>
+      <label class="set-row"><span class="set-label">1 día antes del viaje</span>
+        <input type="checkbox" data-toggle-packing1d ${s.packing1d ? 'checked' : ''}></label>
+    </section>` : '';
 
-  openSheet('Avisos', on ? 'Avisos activados' : 'Sin activar', actions);
+  return `
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">◑</span> Mis Viajes</div>
+    <span></span>
+  </header>
+  <main class="wrap">
+    <h2 class="set-title">Ajustes</h2>
+
+    <section class="set-card">
+      <div class="set-head">Notificaciones</div>
+      ${notifSection}
+    </section>
+
+    ${notifExtra}
+
+    <section class="set-card">
+      <div class="set-head">Apariencia</div>
+      <div class="set-row">
+        <span class="set-label">Tema</span>
+        <div class="seg">
+          <button class="seg-btn ${s.theme === 'light' ? 'is-active' : ''}" data-set-theme="light">Claro</button>
+          <button class="seg-btn ${s.theme === 'dark' ? 'is-active' : ''}" data-set-theme="dark">Oscuro</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="set-card">
+      <div class="set-head">Copia de seguridad</div>
+      <p class="muted">Exporta todos tus viajes, plantillas y ajustes a un archivo, e impórtalo para restaurarlo.</p>
+      <button class="btn wide" data-export>Exportar datos</button>
+      <label class="btn wide ghost import-btn">Importar datos
+        <input type="file" accept="application/json,.json" data-import hidden>
+      </label>
+    </section>
+  </main>
+  ${bottomNav('settings')}`;
 }
 
 /* ============================================================
@@ -816,6 +911,7 @@ async function openNotifySheet() {
    ============================================================ */
 function boot() {
   store.load();
+  applyTheme();
   go('home');
   // Service worker (solo para caché offline de la PWA)
   if ('serviceWorker' in navigator) {
